@@ -703,7 +703,7 @@ class AutomaticDimensioning:
         """
 
 
-        self.fenetreMessage(QMessageBox, "info", query3)
+        # self.fenetreMessage(QMessageBox, "info", query3)
         result = self.executerRequette(query3, True)
         self.add_pg_layer("temp", "cheminement_" + zs_refpm.split("_")[2].lower())
         self.copy_style("p_cheminement", "cheminement_" + zs_refpm.split("_")[2].lower())
@@ -717,8 +717,8 @@ class AutomaticDimensioning:
                         message2 += " and " + str(result[i][1])
 
                 # self.fenetreMessage(QMessageBox, "Warning!", "You have " + str(len(result)) + " loops in your network at cheminements " + str(result[0][1]) + " and " + str(result[1][1]))
-                self.fenetreMessage(QMessageBox, "Warning!", message2)
-                self.fenetreMessage(QMessageBox, "Warning!", str(result))
+                # self.fenetreMessage(QMessageBox, "Warning!", message2)
+                # self.fenetreMessage(QMessageBox, "Warning!", str(result))
         else:
             self.fenetreMessage(QMessageBox, "Successful!" ,"The table is oriented")
 
@@ -854,11 +854,11 @@ class AutomaticDimensioning:
 
 
 
-        self.fenetreMessage(QMessageBox, "Successful!", query2)
+        # self.fenetreMessage(QMessageBox, "Successful!", query2)
 
         self.executerRequette(query2, False)
 
-        self.fenetreMessage(QMessageBox, "Successful!", message)
+        # self.fenetreMessage(QMessageBox, "Successful!", message)
 
         # Enable the button of cable dimensioning
         self.dlg.findChild(QPushButton, "pushButton_dimensions").setEnabled(True)
@@ -867,13 +867,13 @@ class AutomaticDimensioning:
     def create_temp_table(self, shema, table_name, zs_refpm):
         # drop previous version if exists
         query_drop = "DROP TABLE IF EXISTS temp.Cheminement_" + zs_refpm.split("_")[2] + " CASCADE;"
-        self.fenetreMessage(QMessageBox, "Drop!", query_drop)
+        # self.fenetreMessage(QMessageBox, "Drop!", query_drop)
         self.executerRequette(query_drop, False)
         # temporarry Cheminement table
         # query_inner = "SELECT * FROM temp.p_cheminement WHERE cm_zs_code like '%" + zs_refpm.split("_")[2] + "%' AND cm_typelog IN ('TD', 'DI', 'RA')"
         query_inner = "SELECT * FROM prod.p_cheminement WHERE cm_zs_code like '%" + zs_refpm.split("_")[2] + "%'"
         query_outer = "CREATE TABLE temp.Cheminement_" + zs_refpm.split("_")[2] + " as (" + query_inner + ");"
-        self.fenetreMessage(QMessageBox, "Successful!", query_outer)
+        # self.fenetreMessage(QMessageBox, "Successful!", query_outer)
         self.executerRequette(query_outer, False)
 
 
@@ -883,7 +883,7 @@ class AutomaticDimensioning:
         # zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
 
-        self.fenetreMessage(QMessageBox, "Success", "Topology will be verified")
+        # self.fenetreMessage(QMessageBox, "Success", "Topology will be verified")
         query_topo = """DO
                     $$
                     DECLARE
@@ -991,7 +991,7 @@ class AutomaticDimensioning:
                         $$ language plpgsql;"""
 
 
-        self.fenetreMessage(QMessageBox, "info", query_topo)
+        # self.fenetreMessage(QMessageBox, "info", query_topo)
         self.executerRequette(query_topo, False)
         self.fenetreMessage(QMessageBox, "Success", "Topology has been verified")
         try:
@@ -1075,9 +1075,9 @@ class AutomaticDimensioning:
 
                         $$ language plpgsql;"""
 
-        self.fenetreMessage(QMessageBox, 'remove_raccord', query_remove)
+        # self.fenetreMessage(QMessageBox, 'remove_raccord', query_remove)
         self.executerRequette(query_remove, False)
-        self.fenetreMessage(QMessageBox, 'remove_raccord', 'after query')
+        # self.fenetreMessage(QMessageBox, 'remove_raccord', 'after query')
 
 
 
@@ -1086,7 +1086,7 @@ class AutomaticDimensioning:
 
     def create_cable_geom(self, schema, table_name, zs_refpm):
         query_drop = "DROP TABLE IF EXISTS " + schema + "." + table_name + "_" + zs_refpm.split("_")[2] + ";"
-        self.fenetreMessage(QMessageBox, "Drop!", query_drop)
+        # self.fenetreMessage(QMessageBox, "Drop!", query_drop)
         self.executerRequette(query_drop, False)
 
         create_geom = """DO
@@ -1120,7 +1120,7 @@ class AutomaticDimensioning:
                     language plpgsql;
 
                     """
-        self.fenetreMessage(QMessageBox, "create cable geometry", create_geom)
+        # self.fenetreMessage(QMessageBox, "create cable geometry", create_geom)
         self.executerRequette(create_geom, False)
 
 
@@ -1130,7 +1130,7 @@ class AutomaticDimensioning:
 
 
         self.remove_raccord(zs_refpm)
-        self.fenetreMessage(QMessageBox, "info", "After remove raccord")
+        # self.fenetreMessage(QMessageBox, "info", "After remove raccord")
         try:
             self.add_pg_layer("temp", "cheminement_" + zs_refpm.split("_")[2].lower() + "_without_r")
         except Exception as e:
@@ -1164,7 +1164,7 @@ class AutomaticDimensioning:
                              FROM temp.cable_""" + zs_refpm.split("_")[2] + """) as subquery
                 WHERE cable.id = subquery.id"""
 
-        self.fenetreMessage(QMessageBox, "Successful!", query)
+        # self.fenetreMessage(QMessageBox, "Successful!", query)
         self.executerRequette(query, False)
 
 
@@ -1194,7 +1194,7 @@ class AutomaticDimensioning:
         # self.split_cable (schema, table_name, zs_refpm)
         add_columns = "ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN fb_utile integer; ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN capacite integer; ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN Aer_Sou varchar(3);  ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN ft_bt varchar(3); ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN type_cable varchar(30); ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN cb_code integer; "
         self.executerRequette(add_columns, False)
-        self.fenetreMessage(QMessageBox, "info", "After add columns and before calcul_fb_utiles")
+        # self.fenetreMessage(QMessageBox, "info", "After add columns and before calcul_fb_utiles")
         self.calcul_fb_utile_cable(zs_refpm)
         # calculate_distance = """UPDATE temp.cable_al01 cable
         #         SET dist = ST_Length(geom);"""
@@ -1211,8 +1211,8 @@ class AutomaticDimensioning:
 
 
     def calcul_fb_utile_cable(self, zs_refpm):
-        self.fenetreMessage(QMessageBox, "test", "zs_refpm = ")
-        self.fenetreMessage(QMessageBox, "test", "zs_refpm = " + zs_refpm)
+        # self.fenetreMessage(QMessageBox, "test", "zs_refpm = ")
+        # self.fenetreMessage(QMessageBox, "test", "zs_refpm = " + zs_refpm)
         query = """UPDATE temp.cable_""" + zs_refpm.split("_")[2] + """ cable
                 SET fb_utile = subquery.cb_fo_util
 
@@ -1224,13 +1224,13 @@ class AutomaticDimensioning:
 
                 WHERE cable.id = subquery.cable_id;"""
 
-        self.fenetreMessage(QMessageBox, "info", "The query 'calcul_fb_utile_cable will be executed")
+        # self.fenetreMessage(QMessageBox, "info", "The query 'calcul_fb_utile_cable will be executed")
         self.executerRequette(query, False)
-        self.fenetreMessage(QMessageBox, "info", "The query is executed")
+        self.fenetreMessage(QMessageBox, "info", "The query 'calcul_fb_utile_cable' is executed")
 
 
     def aer_sou(self, zs_refpm):
-        self.fenetreMessage(QMessageBox, "info", "aer_sou")
+        # self.fenetreMessage(QMessageBox, "info", "aer_sou")
         query = """ UPDATE temp.cable_""" + zs_refpm.split("_")[2] + """ cable
                 SET aer_sou = 
                 CASE 
@@ -1252,7 +1252,7 @@ class AutomaticDimensioning:
 
                 WHERE cable.id = subquery.cable_id;"""
         self.executerRequette(query, False)
-        self.fenetreMessage(QMessageBox, "info", "The query is executed")
+        # self.fenetreMessage(QMessageBox, "info", "The query is executed")
 
 
     def ft_bt(self, zs_refpm):
@@ -1269,7 +1269,7 @@ class AutomaticDimensioning:
 
 
         self.executerRequette(query, False)
-        self.fenetreMessage(QMessageBox, "info", "The query of ft_bt is executed")
+        # self.fenetreMessage(QMessageBox, "info", "The query of ft_bt is executed")
 
 
 
@@ -1286,7 +1286,7 @@ class AutomaticDimensioning:
                 FROM temp.cable_""" + zs_refpm.split("_")[2] + """ as cable) subquery
                 WHERE temp.cable_""" + zs_refpm.split("_")[2] + """.id = subquery.id;  """
         self.executerRequette(query, False)
-        self.fenetreMessage(QMessageBox, "info", "The query of cable_type is executed")
+        # self.fenetreMessage(QMessageBox, "info", "The query of cable_type is executed")
 
     def update_cb_code(self, zs_refpm):
         query = """ update temp.cable_""" + zs_refpm.split("_")[2] + """ set cb_code = case
@@ -1318,7 +1318,7 @@ class AutomaticDimensioning:
                     END"""
 
         self.executerRequette(query, False)
-        self.fenetreMessage(QMessageBox, "info", "The query of update_cb_code is executed")
+        # self.fenetreMessage(QMessageBox, "info", "The query of update_cb_code is executed")
 
 
     def update_p_cheminement(self):
@@ -1339,7 +1339,7 @@ class AutomaticDimensioning:
                                  SELECT cb_code, geom from temp.cable_""" + zs_refpm.split("_")[2] + """  
                                  WHERE id not in (SELECT cable.id FROM temp.cable_""" + zs_refpm.split("_")[2] + """ as cable 
                                  JOIN prod.p_sitetech as stech ON ST_Dwithin(cable.geom, stech.geom, 0.0001))"""
-        self.fenetreMessage(QMessageBox, "info", "The query will be executed")
+        # self.fenetreMessage(QMessageBox, "info", "The query will be executed")
         self.executerRequette(query_update_cable, False)
         self.fenetreMessage(QMessageBox, "info", "The table p_cable is updated")
 
