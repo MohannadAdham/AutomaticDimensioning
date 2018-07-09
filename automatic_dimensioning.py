@@ -1336,7 +1336,7 @@ class AutomaticDimensioning:
     def update_p_cable(self):
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         query_update_cable = """INSERT INTO prod.p_cable(cb_code, geom)
-                                 SELECT cb_code, geom from temp.cable_""" + zs_refpm.split("_")[2] + """  
+                                 SELECT cb_code, ST_LineMerge(geom) from temp.cable_""" + zs_refpm.split("_")[2] + """  
                                  WHERE id not in (SELECT cable.id FROM temp.cable_""" + zs_refpm.split("_")[2] + """ as cable 
                                  JOIN prod.p_sitetech as stech ON ST_Dwithin(cable.geom, stech.geom, 0.0001))"""
         # self.fenetreMessage(QMessageBox, "info", "The query will be executed")
