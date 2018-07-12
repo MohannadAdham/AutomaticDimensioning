@@ -874,7 +874,7 @@ class AutomaticDimensioning:
         # temporarry Cheminement table
         # query_inner = "SELECT * FROM temp.p_cheminement WHERE cm_zs_code like '%" + zs_refpm.split("_")[2] + "%' AND cm_typelog IN ('TD', 'DI', 'RA')"
         query_inner = "SELECT * FROM prod.p_cheminement WHERE cm_zs_code like '%" + zs_refpm.split("_")[2] + "%'"
-        query_outer = "CREATE TABLE temp.Cheminement_" + zs_refpm.split("_")[2] + " as (" + query_inner + ");"
+        query_outer = "CREATE TABLE temp.Cheminement_" + zs_refpm.split("_")[2] + " as (" + query_inner + "); ALTER TABLE temp.Cheminement_" + zs_refpm.split("_")[2] + " ADD PRIMARY KEY (cm_id);"
         # self.fenetreMessage(QMessageBox, "Successful!", query_outer)
         self.executerRequette(query_outer, False)
 
