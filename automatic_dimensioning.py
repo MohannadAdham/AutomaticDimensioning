@@ -864,6 +864,8 @@ class AutomaticDimensioning:
         self.dlg.findChild(QPushButton, "pushButton_dimensions").setEnabled(True)
 
 
+    # ---------------------------------- needs to be modified --------------------------------------
+
     def create_temp_table(self, shema, table_name, zs_refpm):
         # drop previous version if exists
         query_drop = "DROP TABLE IF EXISTS temp.Cheminement_" + zs_refpm.split("_")[2] + " CASCADE;"
@@ -876,7 +878,7 @@ class AutomaticDimensioning:
         # self.fenetreMessage(QMessageBox, "Successful!", query_outer)
         self.executerRequette(query_outer, False)
 
-
+    #------------------------------------------------------------------------------------------------
 
 
     def verify_topology(self):
@@ -1324,12 +1326,75 @@ class AutomaticDimensioning:
     def update_p_cheminement(self):
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         query_update_chem = """
+        -- mettre a jour la geometrie
         UPDATE prod.p_cheminement SET geom = tempo.geom, cm_fo_util = tempo.cm_fo_util
         FROM temp.cheminement_""" + zs_refpm.split("_")[2] + """ as tempo
-        WHERE prod.p_cheminement.cm_id = tempo.cm_id
+        WHERE prod.p_cheminement.cm_id = tempo.cm_id;
+
+        -- mettre a jour fibre util sauf pour les cheminements commun entre plus qu'un SRO
+        /*UPDATE prod.p_cheminement SET cm_fo_util = tempo2.cm_fo_util
+        FROM temp.cheminement_""" + zs_refpm.split("_")[2] + """ as tempo2
+        WHERE prod.p_cheminement.cm_id = tempo2.cm_id AND prod.p_cheminement.cm_zs_code NOT LIKE '%,%';*/
+
+        UPDATE prod.p_cheminement SET cm_fo_util = tempo2.cm_fo_util
+        FROM temp.cheminement_""" + zs_refpm.split("_")[2] + """ as tempo2
+        WHERE prod.p_cheminement.cm_id = tempo2.cm_id
+
+
+
+        -- mettre a jour fibre util dans les cheminements commun entre plus qu'un SRO
+        /*UPDATE prod.p_cheminement SET cm_fo_util = tempo3.the_sum
+        FROM (select c2.cm_id, count(*), sum(c1.cm_fo_util) as the_sum from prod.p_cheminement as c1,
+            (select * from prod.p_cheminement where cm_zs_code like '%,%' and cm_zs_code like '%""" + zs_refpm.split("_")[2]  + """%') c2
+            where ST_DWithin(ST_EndPoint(c2.geom), ST_StartPoint(c1.geom), 0.0001)
+            group by c2.cm_id) AS tempo3
+        WHERE prod.p_cheminement.cm_id = tempo3.cm_id;*/
+
+
+
         """
 
+        query_update_chem_commun = """
+            Do
+            $$
+            DECLARE
+            quad varchar;
+            the_array varchar[];
+            id integer;
+            zs_code varchar;
+            fo_util integer;
+
+
+            BEGIN
+
+            UPDATE prod.p_cheminement SET cm_fo_util = 0  WHERE cm_zs_code LIKE '%,%' AND cm_typelog IN ('RA','DI','TD');
+
+            FOR id, zs_code, the_array, fo_util IN SELECT c.cm_id, c.cm_zs_code, string_to_array(c.cm_zs_code, ', ') as the_array, c.cm_fo_util FROM prod.p_cheminement as c WHERE c.cm_zs_code LIKE '%,%' AND c.cm_typelog IN ('RA','DI','TD')
+            LOOP 
+
+                FOREACH quad in array the_array
+                LOOP
+                    RAISE NOTICE 'the array : %, quad : %', the_array, quad;
+
+                    IF (SELECT EXISTS (
+                       SELECT *
+                       FROM   information_schema.tables 
+                       WHERE  table_schema = 'temp'
+                       AND    table_name LIKE 'cheminement_' || lower(quad)
+                       )) THEN RAISE NOTICE 'table cheminement_% exists', lower(quad);
+                       EXECUTE 'UPDATE prod.p_cheminement set cm_fo_util = cm_fo_util + (SELECT cm_fo_util from temp.cheminement_' || lower(quad) || ' WHERE cm_id = ' || id || ' ) where cm_id = ' || id;         
+                    END IF;
+                END LOOP;
+                
+            END LOOP;
+                
+            END;
+            $$
+            language plpgsql;"""
+
+
         self.executerRequette(query_update_chem, False)
+        self.executerRequette(query_update_chem_commun, False)
         self.fenetreMessage(QMessageBox, "info", "The table p_cheminement is updated")
 
 
