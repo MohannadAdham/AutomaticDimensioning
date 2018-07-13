@@ -817,6 +817,8 @@ class AutomaticDimensioning:
                 EXECUTE 'CREATE TABLE prod.p_cheminement_' || sro || '(gid serial, rang integer, this_id integer, fo_util integer, geom Geometry(Linestring,2154))';
                 EXECUTE 'INSERT INTO prod.p_cheminement_' || sro || '(this_id, rang, geom) select this_id, rang, geom from clusters';
 
+                --------------------------------------------------------------------------------------
+
                 EXECUTE ' UPDATE prod.p_cheminement_' || sro || '
                      SET fo_util = B.total_fibr
                      FROM (
@@ -832,6 +834,26 @@ class AutomaticDimensioning:
                          ) AS B
                      WHERE prod.p_cheminement_' || sro || '.this_id = B.this_id';
 
+
+                -------------------------------- New part developped by Kevin ---------------------------
+
+
+                EXECUTE ' UPDATE prod.p_cheminement_' || sro || '
+                        SET fo_util = A.zd_fo_util
+                        FROM (
+                            SELECT f.this_id, zd_fo_util
+                            FROM prod.p_cheminement_' || sro || ' f
+                            LEFT JOIN prod.p_cheminement_' || sro || ' f2 ON ST_DWITHIN(ST_EndPoint(f.geom), ST_StartPoint(f2.geom), 0.0001)
+                            LEFT JOIN prod.p_ebp e ON ST_DWITHIN(ST_EndPoint(f.geom), e.geom, 0.0001)
+                            LEFT JOIN prod.p_zdep z ON e.bp_id = z.zd_r6_code
+                            WHERE f2.this_id IS NULL AND e.bp_id IS NOT NULL AND e.bp_pttype <> 7
+                            ORDER BY f.this_id
+                            ) AS A
+                        WHERE prod.p_cheminement_' || sro || '.this_id = A.this_id';
+
+
+                ------------------------------------------------------------------------------------------
+
                 DROP TABLE IF EXISTS prod.p_cheminement_tbr;
                 CREATE TABLE prod.p_cheminement_tbr (gid serial, rang integer, this_id integer, fo_util integer, geom Geometry(Linestring,2154));
                 EXECUTE 'INSERT INTO prod.p_cheminement_tbr SELECT * FROM prod.p_cheminement_' || sro; 
@@ -841,6 +863,10 @@ class AutomaticDimensioning:
                      EXECUTE 'UPDATE prod.p_cheminement_' || sro || ' c SET fo_util = (Select (SUM(c2.fo_util) + (Case when (Select SUM(z.zd_fo_util) from prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) IS NOT NULL then (Select SUM(z.zd_fo_util) from prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) else 0 End ) ) As fo_util FROM prod.p_cheminement_' || sro || ' c2 WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001)) WHERE c.gid = $1' USING id.gid;
                      --EXECUTE 'UPDATE prod.p_cheminement_' || sro || ' c SET fo_util = (Select (SUM(c2.fo_util) + (Case when z.zd_fo_util IS NOT NULL then z.zd_fo_util else 0 End)) As fo_util FROM prod.p_cheminement_' || sro || ' c2 LEFT JOIN prod.p_ebp e ON ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001) GROUP BY z.zd_fo_util) WHERE c.gid = $1' USING id.gid;
                     END LOOP;
+
+
+                --------------------------------------------------------------------------------------
+
 
                 EXECUTE 'UPDATE temp.cheminement_' || sro || ' SET cm_fo_util = temp_chemin.fo_util FROM prod.p_cheminement_' || sro || ' AS temp_chemin WHERE cm_id = temp_chEmin.this_id';
                     
