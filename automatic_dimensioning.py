@@ -1139,7 +1139,7 @@ class AutomaticDimensioning:
 
                     CREATE TABLE temp.""" + table_name + """_""" + zs_refpm.split("_")[2] +""" AS (SELECT ROW_NUMBER() OVER() AS ID, GEOM 
                     FROM (SELECT cable,
-                               ST_Multi(ST_Union(c.geom)) as geom
+                               ST_LineMerge(ST_Union(c.geom)) as geom
                              FROM temp.cheminement_""" + zs_refpm.split("_")[2] + """_without_r As c
                         GROUP BY cable)as cable_geom);
 
