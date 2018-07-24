@@ -1186,17 +1186,17 @@ class AutomaticDimensioning:
                 SET capacite = subquery.case
                 FROM
                 (select id, fb_utile, CASE
-                            WHEN fb_utile * 2 <= 12 THEN 12 
-                            WHEN fb_utile * 2 > 12 AND fb_utile * 2 <= 24 THEN 24
-                            WHEN fb_utile * 2 > 24 AND fb_utile * 2 <= 48 THEN 48
-                            WHEN fb_utile * 2 > 48 AND fb_utile * 2 <= 72 THEN 72
-                            WHEN fb_utile * 2 > 72 AND fb_utile * 2 <= 96 THEN 96
-                            WHEN fb_utile * 2 > 96 AND fb_utile * 2 <= 144 THEN 144
-                            WHEN fb_utile * 2 > 144 AND fb_utile * 2 <= 288 THEN 288
-                            WHEN fb_utile * 2 > 288 AND fb_utile * 2 <= 432 THEN 432
-                            WHEN fb_utile * 2 > 432 AND fb_utile * 2 <= 576 THEN 576
-                            WHEN fb_utile * 2 > 576 AND fb_utile * 2 <= 720 THEN 720
-                            WHEN fb_utile * 2 > 720 AND fb_utile * 2 <= 864 THEN 864
+                            WHEN fb_utile  <= 12 THEN 12 
+                            WHEN fb_utile  > 12 AND fb_utile * 2 <= 24 THEN 24
+                            WHEN fb_utile  > 24 AND fb_utile * 2 <= 48 THEN 48
+                            WHEN fb_utile  > 48 AND fb_utile * 2 <= 72 THEN 72
+                            WHEN fb_utile  > 72 AND fb_utile * 2 <= 96 THEN 96
+                            WHEN fb_utile  > 96 AND fb_utile * 2 <= 144 THEN 144
+                            WHEN fb_utile  > 144 AND fb_utile * 2 <= 288 THEN 288
+                            WHEN fb_utile  > 288 AND fb_utile * 2 <= 432 THEN 432
+                            WHEN fb_utile  > 432 AND fb_utile * 2 <= 576 THEN 576
+                            WHEN fb_utile  > 576 AND fb_utile * 2 <= 720 THEN 720
+                            WHEN fb_utile  > 720 AND fb_utile * 2 <= 864 THEN 864
                             
                             
                              END
