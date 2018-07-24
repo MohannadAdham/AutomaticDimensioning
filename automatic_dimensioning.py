@@ -815,12 +815,14 @@ class AutomaticDimensioning:
 
                 EXECUTE 'DROP TABLE IF EXISTS prod.p_cheminement_' || sro;
                 EXECUTE 'CREATE TABLE prod.p_cheminement_' || sro || '(gid serial, rang integer, this_id integer, fo_util integer, reserve integer, geom Geometry(Linestring,2154))';
+                ALTER TABLE prod.p_cheminement_""" + zs_refpm.split("_")[2] + """ ADD PRIMARY KEY (gid);
+                CREATE INDEX ON prod.p_cheminement_""" + zs_refpm.split("_")[2] + """ USING GIST(geom); 
                 EXECUTE 'INSERT INTO prod.p_cheminement_' || sro || '(this_id, rang, geom) SELECT this_id, rang, geom from clusters';
 
                 --------------------------------------------------------------------------------------
 
                 EXECUTE ' UPDATE prod.p_cheminement_' || sro || '
-                     SET fo_util = B.total_fibr *2,
+                     SET fo_util = B.total_fibr,
                      reserve = B.total_fibr * 2 ------ new 1 ------
                      FROM (
                         SELECT c.cm_id as this_id, n.total_fibr 
@@ -869,6 +871,10 @@ class AutomaticDimensioning:
                      EXECUTE 'UPDATE prod.p_cheminement_' || sro || ' c SET fo_util = (Select (SUM(c2.fo_util) + (Case when (Select SUM(z.zd_fo_util)
                      FROM prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) IS NOT NULL 
                      THEN (Select SUM(z.zd_fo_util) from prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) else 0 End )) As fo_util 
+                     FROM prod.p_cheminement_' || sro || ' c2 WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001)),
+                     reserve = (Select (SUM(c2.reserve) + (Case when (Select SUM(z.zd_fo_util)
+                     FROM prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) IS NOT NULL 
+                     THEN (Select SUM(z.zd_fo_util) from prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) else 0 End )) As fo_util 
                      FROM prod.p_cheminement_' || sro || ' c2 WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001))
 
                      WHERE c.gid = $1' USING id.gid;
@@ -879,7 +885,7 @@ class AutomaticDimensioning:
                 --------------------------------------------------------------------------------------
 
 
-                EXECUTE 'UPDATE temp.cheminement_' || sro || ' SET cm_fo_util = temp_chemin.fo_util FROM prod.p_cheminement_' || sro || ' AS temp_chemin WHERE cm_id = temp_chEmin.this_id';
+                EXECUTE 'UPDATE temp.cheminement_' || sro || ' SET cm_fo_util = temp_chemin.reserve FROM prod.p_cheminement_' || sro || ' AS temp_chemin WHERE cm_id = temp_chEmin.this_id';
                     
                 -- DROP TABLE IF EXISTS prod.p_cheminement_tbr;
                                         
@@ -911,7 +917,10 @@ class AutomaticDimensioning:
         # temporarry Cheminement table
         # query_inner = "SELECT * FROM temp.p_cheminement WHERE cm_zs_code like '%" + zs_refpm.split("_")[2] + "%' AND cm_typelog IN ('TD', 'DI', 'RA')"
         query_inner = "SELECT * FROM prod.p_cheminement WHERE cm_zs_code like '%" + zs_refpm.split("_")[2] + "%'"
-        query_outer = "CREATE TABLE temp.Cheminement_" + zs_refpm.split("_")[2] + " as (" + query_inner + "); ALTER TABLE temp.Cheminement_" + zs_refpm.split("_")[2] + " ADD PRIMARY KEY (cm_id);"
+        query_outer = """CREATE TABLE temp.Cheminement_""" + zs_refpm.split("_")[2] + """ as (""" + query_inner + """);
+         ALTER TABLE temp.Cheminement_""" + zs_refpm.split("_")[2] + """ ADD PRIMARY KEY (cm_id);
+         CREATE INDEX ON temp.Cheminement_""" + zs_refpm.split("_")[2] + """ USING GIST(geom); 
+         """
         # self.fenetreMessage(QMessageBox, "Successful!", query_outer)
         self.executerRequette(query_outer, False)
 
@@ -1083,6 +1092,8 @@ class AutomaticDimensioning:
 
                         CREATE TABLE temp.cheminement_""" + zs_refpm.split("_")[2].lower() + """_without_r AS 
                         (SELECT * FROM temp.cheminement_""" + zs_refpm.split("_")[2] + """);
+                        ALTER TABLE temp.Cheminement_""" + zs_refpm.split("_")[2].lower() + """_without_r ADD PRIMARY KEY (cm_id);
+                        CREATE INDEX ON temp.Cheminement_""" + zs_refpm.split("_")[2].lower() + """_without_r USING GIST(geom); 
 
                         LOOP
 
@@ -1154,6 +1165,10 @@ class AutomaticDimensioning:
                              FROM temp.cheminement_""" + zs_refpm.split("_")[2] + """_without_r As c
                         GROUP BY cable)as cable_geom);
 
+
+                    ALTER TABLE temp.cable_""" + zs_refpm.split("_")[2].lower() + """ ADD PRIMARY KEY (id);
+                    CREATE INDEX ON temp.cable_""" + zs_refpm.split("_")[2].lower() + """ USING GIST(geom);
+
                     END;
                     $$
                     language plpgsql;
@@ -1175,7 +1190,10 @@ class AutomaticDimensioning:
         except Exception as e:
             self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
 
-        self.create_cable_geom(schema, table_name, zs_refpm)
+        try:
+            self.create_cable_geom(schema, table_name, zs_refpm)
+        except Exception as e:
+            self.fenetreMessage(QMessageBox.Warning, "Erreur_fenetreMessage", str(e))
 
 
 
@@ -1187,16 +1205,16 @@ class AutomaticDimensioning:
                 FROM
                 (select id, fb_utile, CASE
                             WHEN fb_utile  <= 12 THEN 12 
-                            WHEN fb_utile  > 12 AND fb_utile * 2 <= 24 THEN 24
-                            WHEN fb_utile  > 24 AND fb_utile * 2 <= 48 THEN 48
-                            WHEN fb_utile  > 48 AND fb_utile * 2 <= 72 THEN 72
-                            WHEN fb_utile  > 72 AND fb_utile * 2 <= 96 THEN 96
-                            WHEN fb_utile  > 96 AND fb_utile * 2 <= 144 THEN 144
-                            WHEN fb_utile  > 144 AND fb_utile * 2 <= 288 THEN 288
-                            WHEN fb_utile  > 288 AND fb_utile * 2 <= 432 THEN 432
-                            WHEN fb_utile  > 432 AND fb_utile * 2 <= 576 THEN 576
-                            WHEN fb_utile  > 576 AND fb_utile * 2 <= 720 THEN 720
-                            WHEN fb_utile  > 720 AND fb_utile * 2 <= 864 THEN 864
+                            WHEN fb_utile  > 12 AND fb_utile  <= 24 THEN 24
+                            WHEN fb_utile  > 24 AND fb_utile  <= 48 THEN 48
+                            WHEN fb_utile  > 48 AND fb_utile  <= 72 THEN 72
+                            WHEN fb_utile  > 72 AND fb_utile  <= 96 THEN 96
+                            WHEN fb_utile  > 96 AND fb_utile  <= 144 THEN 144
+                            WHEN fb_utile  > 144 AND fb_utile  <= 288 THEN 288
+                            WHEN fb_utile  > 288 AND fb_utile  <= 432 THEN 432
+                            WHEN fb_utile  > 432 AND fb_utile  <= 576 THEN 576
+                            WHEN fb_utile  > 576 AND fb_utile  <= 720 THEN 720
+                            WHEN fb_utile  > 720 AND fb_utile  <= 864 THEN 864
                             
                             
                              END
