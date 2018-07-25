@@ -49,6 +49,8 @@ import os.path
 
 class AutomaticDimensioning:
     global conn, cursor
+    global isMultistring
+    isMultistring = False
     """QGIS Plugin Implementation."""
 
     def __init__(self, iface):
@@ -302,6 +304,7 @@ class AutomaticDimensioning:
 
     def executerRequette(self, Requette, boool):
         global conn
+        
         try:
             cursor = conn.cursor()
             cursor.execute(Requette)
@@ -320,6 +323,37 @@ class AutomaticDimensioning:
         except Exception as e:
             self.fenetreMessage(QMessageBox.Warning,"Erreur_executerRequette",str(e))
             cursor.close()
+            self.connectToDb()
+
+            if "MultiLineString" in str(e):
+                # self.fenetreMessage(QMessageBox, "info", "You have a cable with MultilineString geometry (cable id = " + str(self.findMultiLineString()) + ")")
+                self.isMultistring = True
+                self.findMultiLineString()
+
+    def findMultiLineString(self):
+        zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
+
+        query = "SELECT id FROM temp.cable_" + zs_refpm.split("_")[2].lower()  + " WHERE ST_GeometryType(geom) = 'ST_MultiLineString'"
+        result = self.executerRequette(query,  True)
+        # return result[0][0]
+        if len(result) > 0:
+            message2 = "You have " + str(len(result)) + "  cables with MultilineString geometry at id = " + str(result[0][0])
+            for i in range(1, len(result)):
+                if i < len(result) - 1:
+                    message2 += ", " + str(result[i][0])
+                else :
+                    message2 += " and " + str(result[i][0])
+        message2 += "\n Please consult the table cable_multilinestring_" + zs_refpm.split("_")[2].lower()
+        self.fenetreMessage(QMessageBox, "Warning!", message2)
+
+        query2 = """ DROP TABLE IF EXISTS temp.cable_multilinestring_""" + zs_refpm.split("_")[2].lower()  + """;
+
+                CREATE TABLE temp.cable_multilinestring_""" + zs_refpm.split("_")[2].lower()  + """ AS 
+                SELECT id, geom FROM temp.cable_""" + zs_refpm.split("_")[2].lower()  + """ WHERE ST_GeometryType(geom) = 'ST_MultiLineString';
+
+         """
+        self.executerRequette(query2,  False)
+        self.add_pg_layer("temp", "cable_multilinestring_" + zs_refpm.split("_")[2].lower())
 
 
 
@@ -1459,9 +1493,13 @@ class AutomaticDimensioning:
                                  SELECT cb_code, ST_LineMerge(geom), '""" + zs_refpm.split("_")[2] + """' from temp.cable_""" + zs_refpm.split("_")[2] + """  
                                  WHERE id not in (SELECT cable.id FROM temp.cable_""" + zs_refpm.split("_")[2] + """ as cable 
                                  JOIN prod.p_sitetech as stech ON ST_Dwithin(cable.geom, stech.geom, 0.0001))"""
-        # self.fenetreMessage(QMessageBox, "info", "The query will be executed")
-        self.executerRequette(query_update_cable, False)
-        self.fenetreMessage(QMessageBox, "info", "The table p_cable is updated")
+        try:
+            # self.fenetreMessage(QMessageBox, "info", "The query will be executed")
+            self.executerRequette(query_update_cable, False)
+            if not self.isMultistring:
+                self.fenetreMessage(QMessageBox, "info", "The table p_cable is updated " + str(self.isMultistring))
+        except Exception as e:
+            self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
 
 
     def copy_style(self, source, dest):
