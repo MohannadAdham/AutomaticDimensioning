@@ -851,7 +851,7 @@ class AutomaticDimensioning:
                 EXECUTE 'CREATE TABLE temp.p_cheminement_' || sro || '(gid serial, rang integer, this_id integer, fo_util integer, reserve integer, geom Geometry(Linestring,2154))';
                 ALTER TABLE temp.p_cheminement_""" + zs_refpm.split("_")[2] + """ ADD PRIMARY KEY (gid);
                 CREATE INDEX ON temp.p_cheminement_""" + zs_refpm.split("_")[2] + """ USING GIST(geom); 
-                EXECUTE 'INSERT INTO temp.p_cheminement_' || sro || '(this_id, rang, geom) SELECT this_id, rang, geom from clusters';
+                EXECUTE 'INSERT INTO temp.p_cheminement_' || sro || '(this_id, rang, geom) SELECT this_id, rang, geom from temp.clusters';
 
                 --------------------------------------------------------------------------------------
 
@@ -921,7 +921,7 @@ class AutomaticDimensioning:
 
                 EXECUTE 'UPDATE temp.cheminement_' || sro || ' SET cm_fo_util = temp_chemin.reserve FROM temp.p_cheminement_' || sro || ' AS temp_chemin WHERE cm_id = temp_chEmin.this_id';
                     
-                -- DROP TABLE IF EXISTS temp.p_cheminement_tbr;
+                DROP TABLE IF EXISTS temp.p_cheminement_tbr;
                                         
                 END;
                 $$ language plpgsql;
