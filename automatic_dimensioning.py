@@ -49,7 +49,7 @@ import os.path
 
 class AutomaticDimensioning:
     global conn, cursor
-    global isMultistring
+    # global isMultistring
     isMultistring = False
     """QGIS Plugin Implementation."""
 
@@ -1497,7 +1497,7 @@ class AutomaticDimensioning:
             # self.fenetreMessage(QMessageBox, "info", "The query will be executed")
             self.executerRequette(query_update_cable, False)
             if not self.isMultistring:
-                self.fenetreMessage(QMessageBox, "info", "The table p_cable is updated " + str(self.isMultistring))
+                self.fenetreMessage(QMessageBox, "info", "The table p_cable is updated ")
         except Exception as e:
             self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
 
