@@ -464,11 +464,11 @@ class AutomaticDimensioning:
 
                 BEGIN
 
-                    DROP TABLE IF EXISTS clusters;
-                    CREATE TABLE clusters (gid serial, this_id integer, rang integer, geom Geometry(Linestring,2154));  
-                    CREATE INDEX clusters_geom_gist ON clusters USING GIST (geom); 
+                    DROP TABLE IF EXISTS temp.clusters;
+                    CREATE TABLE temp.clusters (gid serial, this_id integer, rang integer, geom Geometry(Linestring,2154));  
+                    CREATE INDEX clusters_geom_gist ON temp.clusters USING GIST (geom); 
 
-                    INSERT INTO clusters(this_id, rang, geom)   
+                    INSERT INTO temp.clusters(this_id, rang, geom)   
                     SELECT c.cm_id, counter, c.geom
                     FROM prod.p_cheminement c, prod.p_sitetech s 
                     WHERE ST_INTERSECTS(c.geom, s.geom) AND st_id = 4;
@@ -479,13 +479,13 @@ class AutomaticDimensioning:
                     
                     counter = counter + 1;
                     
-                    INSERT INTO clusters(this_id, rang, geom)
+                    INSERT INTO temp.clusters(this_id, rang, geom)
                     SELECT c.cm_id, counter, c.geom
-                    FROM prod.p_cheminement c, clusters l
-                    WHERE l.rang = (counter - 1) AND St_DWithin(c.geom, l.geom, 0.0001) AND c.cm_id NOT IN (SELECT this_id FROM clusters)
+                    FROM prod.p_cheminement c, temp.clusters l
+                    WHERE l.rang = (counter - 1) AND St_DWithin(c.geom, l.geom, 0.0001) AND c.cm_id NOT IN (SELECT this_id FROM temp.clusters)
                      AND c.cm_zs_code LIKE '%""" + zs_refpm.split("_")[2].lower() + """%';
                        
-                    UPDATE clusters
+                    UPDATE temp.clusters
                     SET geom = ST_Reverse(geom)
                     WHERE this_id IN (
                         SELECT a.this_id
@@ -495,8 +495,8 @@ class AutomaticDimensioning:
                                            OR (St_Dwithin(ST_StartPoint(a.geom), ST_StartPoint(b.geom),0.0001)) Then 'NOK' 
                                            ELSE 'OK'
                                         END as sens
-                            FROM clusters a
-                            LEFT JOIN (SELECT * FROM clusters WHERE rang = (counter - 1)) b ON St_Dwithin(a.geom, b.geom, 0.0001)
+                            FROM temp.clusters a
+                            LEFT JOIN (SELECT * FROM temp.clusters WHERE rang = (counter - 1)) b ON St_Dwithin(a.geom, b.geom, 0.0001)
                             WHERE a.rang = counter
                         ) AS a
                         WHERE a.sens = 'NOK'
@@ -504,12 +504,12 @@ class AutomaticDimensioning:
                         
                     END LOOP;
 
-                    DELETE FROM clusters WHERE gid IN (
+                    DELETE FROM temp.clusters WHERE gid IN (
                                     SELECT gid--, this_id, quantite
                                     FROM (
                                         SELECT gid, this_id, ROW_NUMBER() OVER(PARTITION BY this_id ORDER BY this_id) as quantite
-                                        FROM clusters
-                                        WHERE this_id IN (SELECT this_id FROM clusters GROUP BY this_id HAVING count(this_id) > 1)
+                                        FROM temp.clusters
+                                        WHERE this_id IN (SELECT this_id FROM temp.clusters GROUP BY this_id HAVING count(this_id) > 1)
                                         ) AS A 
                                     WHERE quantite > 1
                                     ORDER BY this_id
@@ -519,7 +519,7 @@ class AutomaticDimensioning:
                     SET geom = A.geom
                     FROM (
                         SELECT this_id, geom
-                        FROM clusters
+                        FROM temp.clusters
                          ) as A
                     WHERE temp.cheminement_""" + zs_refpm.split("_")[2].lower() + """.cm_id = a.this_id;
                                     
@@ -544,14 +544,14 @@ class AutomaticDimensioning:
 
                 BEGIN
 
-                    DROP TABLE IF EXISTS clusters;
-                    CREATE TABLE clusters (gid serial, this_id integer, rang integer, geom Geometry(Linestring,2154));
-                    DROP TABLE IF EXISTS clusters2;
-                    CREATE TABLE clusters2 (gid serial, that_id integer);
-                    DROP TABLE IF EXISTS clusters3;
-                    CREATE TABLE clusters3 (gid serial, that_id integer);   
-                    CREATE INDEX clusters_geom_gist ON clusters USING GIST (geom);  
-                    INSERT INTO clusters(this_id, rang, geom)   
+                    DROP TABLE IF EXISTS temp.clusters;
+                    CREATE TABLE temp.clusters (gid serial, this_id integer, rang integer, geom Geometry(Linestring,2154));
+                    DROP TABLE IF EXISTS temp.clusters2;
+                    CREATE TABLE temp.clusters2 (gid serial, that_id integer);
+                    DROP TABLE IF EXISTS temp.clusters3;
+                    CREATE TABLE temp.clusters3 (gid serial, that_id integer);   
+                    CREATE INDEX clusters_geom_gist ON temp.clusters USING GIST (geom);  
+                    INSERT INTO temp.clusters(this_id, rang, geom)   
                     SELECT c.cm_id, counter, c.geom
                     FROM prod.p_cheminement c, prod.p_sitetech s 
                     WHERE ST_INTERSECTS(c.geom, s.geom) AND st_id = 2;
@@ -562,46 +562,46 @@ class AutomaticDimensioning:
                     
                     counter = counter + 1;
                     
-                    INSERT INTO clusters(this_id, rang, geom)
+                    INSERT INTO temp.clusters(this_id, rang, geom)
                     SELECT c.cm_id, counter, c.geom
-                    FROM prod.p_cheminement c, clusters l
+                    FROM prod.p_cheminement c, temp.clusters l
                     WHERE l.rang = (counter - 1) AND (St_DWITHIN(St_StartPoint(c.geom), St_StartPoint(l.geom),0.0001) 
                     OR St_DWITHIN(St_StartPoint(c.geom), St_Endpoint(l.geom),0.0001) 
                     OR St_DWITHIN(St_EndPoint(c.geom), St_StartPoint(l.geom),0.0001) 
                     OR St_DWITHIN(St_EndPoint(c.geom), St_EndPoint(l.geom),0.0001)) 
-                    AND c.cm_id NOT IN (SELECT this_id FROM clusters) AND c.cm_zs_code LIKE '%""" + zs_refpm.split("_")[2] + """%';
+                    AND c.cm_id NOT IN (SELECT this_id FROM temp.clusters) AND c.cm_zs_code LIKE '%""" + zs_refpm.split("_")[2] + """%';
                        
                     
                     END LOOP;
 
-                    DELETE FROM clusters WHERE gid IN (
+                    DELETE FROM temp.clusters WHERE gid IN (
                                     SELECT gid--, this_id, quantite
                                     FROM (
                                         SELECT gid, this_id, ROW_NUMBER() OVER(PARTITION BY this_id ORDER BY this_id) as quantite
-                                        FROM clusters
-                                        WHERE this_id IN (SELECT this_id FROM clusters GROUP BY this_id HAVING count(this_id) > 1)
+                                        FROM temp.clusters
+                                        WHERE this_id IN (SELECT this_id FROM temp.clusters GROUP BY this_id HAVING count(this_id) > 1)
                                         ) AS A 
                                     WHERE quantite > 1
                                     ORDER BY this_id
                                     );
 
 
-                For id in (Select * from clusters order by gid) loop
-                For id2 in (select * from clusters where (St_DWITHIN(St_StartPoint(id.geom), St_StartPoint(geom),0.0001)
+                For id in (Select * from temp.clusters order by gid) loop
+                For id2 in (select * from temp.clusters where (St_DWITHIN(St_StartPoint(id.geom), St_StartPoint(geom),0.0001)
                  OR St_DWITHIN(St_StartPoint(id.geom), St_Endpoint(geom),0.0001) 
                  OR St_DWITHIN(St_EndPoint(id.geom), St_StartPoint(geom),0.0001) OR St_DWITHIN(St_EndPoint(id.geom), St_EndPoint(geom),0.0001)) 
                  and id.rang = (rang - 1)) loop
-                If St_Dwithin((Select St_EndPoint(geom) from clusters where gid = id.gid),
-                (Select St_EndPoint(geom) from clusters where gid = id2.gid),0.0001) IS TRUE then
+                If St_Dwithin((Select St_EndPoint(geom) from temp.clusters where gid = id.gid),
+                (Select St_EndPoint(geom) from temp.clusters where gid = id2.gid),0.0001) IS TRUE then
                 --RAISE EXCEPTION USING MESSAGE = (id,id2);
-                --IF id2.this_id IN (Select that_id from clusters2) then RAISE EXCEPTION USING MESSAGE = (that_id); End If;
+                --IF id2.this_id IN (Select that_id from temp.clusters2) then RAISE EXCEPTION USING MESSAGE = (that_id); End If;
                 --RAISE EXCEPTION USING MESSAGE = (id,id2);
 
-                IF id2.this_id IN (Select that_id from clusters2) then 
-                INSERT INTO clusters3 (that_id) VALUES (id2.this_id);
+                IF id2.this_id IN (Select that_id from temp.clusters2) then 
+                INSERT INTO temp.clusters3 (that_id) VALUES (id2.this_id);
                 End If;
-                INSERT INTO clusters2 (that_id) VALUES (id2.this_id);
-                UPDATE clusters SET geom = ST_Reverse(geom) where this_id = id2.this_id;
+                INSERT INTO temp.clusters2 (that_id) VALUES (id2.this_id);
+                UPDATE temp.clusters SET geom = ST_Reverse(geom) where this_id = id2.this_id;
                 End If;
                 End loop;
                 End loop;
@@ -611,16 +611,16 @@ class AutomaticDimensioning:
                     SET geom = A.geom
                     FROM (
                         SELECT this_id, geom
-                        FROM clusters
+                        FROM temp.clusters
                          ) as A
                     WHERE temp.cheminement_""" + zs_refpm.split("_")[2] + """.cm_id = a.this_id;
 
-                DELETE FROM clusters WHERE gid IN (
+                DELETE FROM temp.clusters WHERE gid IN (
                                     SELECT gid--, this_id, quantite
                                     FROM (
                                         SELECT gid, this_id, ROW_NUMBER() OVER(PARTITION BY this_id ORDER BY this_id) as quantite
-                                        FROM clusters
-                                        WHERE this_id IN (SELECT this_id FROM clusters GROUP BY this_id HAVING count(this_id) > 1)
+                                        FROM temp.clusters
+                                        WHERE this_id IN (SELECT this_id FROM temp.clusters GROUP BY this_id HAVING count(this_id) > 1)
                                         ) AS A 
                                     WHERE quantite > 1
                                     ORDER BY this_id
@@ -629,7 +629,7 @@ class AutomaticDimensioning:
                                     
                 END;
                 $$ language plpgsql;
-                Select * from clusters3;"""
+                Select * from temp.clusters3;"""
 
 
 
@@ -644,14 +644,14 @@ class AutomaticDimensioning:
 
                 BEGIN
 
-                    DROP TABLE IF EXISTS clusters;
-                    CREATE TABLE clusters (gid serial, this_id integer, rang integer, geom Geometry(Linestring,2154));
-                    DROP TABLE IF EXISTS clusters2;
-                    CREATE TABLE clusters2 (gid serial, that_id integer);
-                    DROP TABLE IF EXISTS clusters3;
-                    CREATE TABLE clusters3 (gid serial, that_id integer);   
-                    CREATE INDEX clusters_geom_gist ON clusters USING GIST (geom);  
-                    INSERT INTO clusters(this_id, rang, geom)   
+                    DROP TABLE IF EXISTS temp.clusters;
+                    CREATE TABLE temp.clusters (gid serial, this_id integer, rang integer, geom Geometry(Linestring,2154));
+                    DROP TABLE IF EXISTS temp.clusters2;
+                    CREATE TABLE temp.clusters2 (gid serial, that_id integer);
+                    DROP TABLE IF EXISTS temp.clusters3;
+                    CREATE TABLE temp.clusters3 (gid serial, that_id integer);   
+                    CREATE INDEX clusters_geom_gist ON temp.clusters USING GIST (geom);  
+                    INSERT INTO temp.clusters(this_id, rang, geom)   
                     SELECT c.cm_id, counter, c.geom
                     FROM prod.p_cheminement c, prod.p_sitetech s 
                     WHERE ST_INTERSECTS(c.geom, s.geom) AND st_id = (SELECT lt_st_code FROM prod.p_ltech WHERE lt_etiquet LIKE '%""" + zs_refpm.split("_")[2] + """');
@@ -663,47 +663,47 @@ class AutomaticDimensioning:
                     
                     counter = counter + 1;
                     
-                    INSERT INTO clusters(this_id, rang, geom)
+                    INSERT INTO temp.clusters(this_id, rang, geom)
                     SELECT c.cm_id, counter, c.geom
-                    FROM prod.p_cheminement c, clusters l
+                    FROM prod.p_cheminement c, temp.clusters l
                     WHERE l.rang = (counter - 1) AND (St_DWITHIN(St_StartPoint(c.geom), St_StartPoint(l.geom),0.0001) 
                     OR St_DWITHIN(St_StartPoint(c.geom), St_Endpoint(l.geom),0.0001) 
                     OR St_DWITHIN(St_EndPoint(c.geom), St_StartPoint(l.geom),0.0001) 
                     OR St_DWITHIN(St_EndPoint(c.geom), St_EndPoint(l.geom),0.0001)) AND cm_typelog IN ('RA','DI','TD') 
-                    AND c.cm_id NOT IN (SELECT this_id FROM clusters) AND c.cm_zs_code LIKE '%""" + zs_refpm.split("_")[2] + """%';
+                    AND c.cm_id NOT IN (SELECT this_id FROM temp.clusters) AND c.cm_zs_code LIKE '%""" + zs_refpm.split("_")[2] + """%';
                        
                     
                     END LOOP;
 
-                    DELETE FROM clusters WHERE gid IN (
+                    DELETE FROM temp.clusters WHERE gid IN (
                                     SELECT gid--, this_id, quantite
                                     FROM (
                                         SELECT gid, this_id, ROW_NUMBER() OVER(PARTITION BY this_id ORDER BY this_id) as quantite
-                                        FROM clusters
-                                        WHERE this_id IN (SELECT this_id FROM clusters GROUP BY this_id HAVING count(this_id) > 1)
+                                        FROM temp.clusters
+                                        WHERE this_id IN (SELECT this_id FROM temp.clusters GROUP BY this_id HAVING count(this_id) > 1)
                                         ) AS A 
                                     WHERE quantite > 1
                                     ORDER BY this_id
                                     );
 
 
-                For id in (Select * from clusters order by gid) loop
-                For id2 in (select * from clusters where (St_DWITHIN(St_StartPoint(id.geom), St_StartPoint(geom),0.0001) 
+                For id in (Select * from temp.clusters order by gid) loop
+                For id2 in (select * from temp.clusters where (St_DWITHIN(St_StartPoint(id.geom), St_StartPoint(geom),0.0001) 
                 OR St_DWITHIN(St_StartPoint(id.geom), St_Endpoint(geom),0.0001) 
                 OR St_DWITHIN(St_EndPoint(id.geom), St_StartPoint(geom),0.0001) 
                 OR St_DWITHIN(St_EndPoint(id.geom), St_EndPoint(geom),0.0001)) 
                 and id.rang = (rang - 1)) loop
-                If St_Dwithin((Select St_EndPoint(geom) from clusters where gid = id.gid),
-                (Select St_EndPoint(geom) from clusters where gid = id2.gid),0.0001) IS TRUE then  
+                If St_Dwithin((Select St_EndPoint(geom) from temp.clusters where gid = id.gid),
+                (Select St_EndPoint(geom) from temp.clusters where gid = id2.gid),0.0001) IS TRUE then  
                 --RAISE EXCEPTION USING MESSAGE = (id,id2);
-                --IF id2.this_id IN (Select that_id from clusters2) then RAISE EXCEPTION USING MESSAGE = (that_id); End If;
+                --IF id2.this_id IN (Select that_id from temp.clusters2) then RAISE EXCEPTION USING MESSAGE = (that_id); End If;
                 --RAISE EXCEPTION USING MESSAGE = (id,id2);
 
-                IF id2.this_id IN (Select that_id from clusters2) then 
-                INSERT INTO clusters3 (that_id) VALUES (id2.this_id);
+                IF id2.this_id IN (Select that_id from temp.clusters2) then 
+                INSERT INTO temp.clusters3 (that_id) VALUES (id2.this_id);
                 End If;
-                INSERT INTO clusters2 (that_id) VALUES (id2.this_id);
-                UPDATE clusters SET geom = ST_Reverse(geom) where this_id = id2.this_id;
+                INSERT INTO temp.clusters2 (that_id) VALUES (id2.this_id);
+                UPDATE temp.clusters SET geom = ST_Reverse(geom) where this_id = id2.this_id;
                 End If;
                 End loop;
                 End loop;
@@ -713,16 +713,16 @@ class AutomaticDimensioning:
                     SET geom = A.geom
                     FROM (
                         SELECT this_id, geom
-                        FROM clusters
+                        FROM temp.clusters
                          ) as A
                     WHERE temp.cheminement_""" + zs_refpm.split("_")[2] + """.cm_id = a.this_id;
 
-                DELETE FROM clusters WHERE gid IN (
+                DELETE FROM temp.clusters WHERE gid IN (
                                     SELECT gid--, this_id, quantite
                                     FROM (
                                         SELECT gid, this_id, ROW_NUMBER() OVER(PARTITION BY this_id ORDER BY this_id) as quantite
-                                        FROM clusters
-                                        WHERE this_id IN (SELECT this_id FROM clusters GROUP BY this_id HAVING count(this_id) > 1)
+                                        FROM temp.clusters
+                                        WHERE this_id IN (SELECT this_id FROM temp.clusters GROUP BY this_id HAVING count(this_id) > 1)
                                         ) AS A 
                                     WHERE quantite > 1
                                     ORDER BY this_id
@@ -731,7 +731,7 @@ class AutomaticDimensioning:
                                     
                 END;
                 $$ language plpgsql;
-                Select * from clusters3;
+                Select * from temp.clusters3;
 
 
         """
@@ -847,15 +847,15 @@ class AutomaticDimensioning:
                 sro = '""" + zs_refpm.split("_")[2] + """'; ---entrez le SRO
 
 
-                EXECUTE 'DROP TABLE IF EXISTS prod.p_cheminement_' || sro;
-                EXECUTE 'CREATE TABLE prod.p_cheminement_' || sro || '(gid serial, rang integer, this_id integer, fo_util integer, reserve integer, geom Geometry(Linestring,2154))';
-                ALTER TABLE prod.p_cheminement_""" + zs_refpm.split("_")[2] + """ ADD PRIMARY KEY (gid);
-                CREATE INDEX ON prod.p_cheminement_""" + zs_refpm.split("_")[2] + """ USING GIST(geom); 
-                EXECUTE 'INSERT INTO prod.p_cheminement_' || sro || '(this_id, rang, geom) SELECT this_id, rang, geom from clusters';
+                EXECUTE 'DROP TABLE IF EXISTS temp.p_cheminement_' || sro;
+                EXECUTE 'CREATE TABLE temp.p_cheminement_' || sro || '(gid serial, rang integer, this_id integer, fo_util integer, reserve integer, geom Geometry(Linestring,2154))';
+                ALTER TABLE temp.p_cheminement_""" + zs_refpm.split("_")[2] + """ ADD PRIMARY KEY (gid);
+                CREATE INDEX ON temp.p_cheminement_""" + zs_refpm.split("_")[2] + """ USING GIST(geom); 
+                EXECUTE 'INSERT INTO temp.p_cheminement_' || sro || '(this_id, rang, geom) SELECT this_id, rang, geom from clusters';
 
                 --------------------------------------------------------------------------------------
 
-                EXECUTE ' UPDATE prod.p_cheminement_' || sro || '
+                EXECUTE ' UPDATE temp.p_cheminement_' || sro || '
                      SET fo_util = B.total_fibr,
                      reserve = B.total_fibr * 2 ------ new 1 ------
                      FROM (
@@ -869,59 +869,59 @@ class AutomaticDimensioning:
                         ON ST_DWithin(St_EndPoint(c.geom), n.geom, 0.0001)
                         WHERE c.cm_zs_code LIKE ''%'|| sro ||'%'' AND n.total_fibr IS NOT NULL 
                          ) AS B
-                     WHERE prod.p_cheminement_' || sro || '.this_id = B.this_id';
+                     WHERE temp.p_cheminement_' || sro || '.this_id = B.this_id';
 
 
                 -------------------------------- New part developped by Kevin ---------------------------
 
 
-                /*EXECUTE ' UPDATE prod.p_cheminement_' || sro || '
+                /*EXECUTE ' UPDATE temp.p_cheminement_' || sro || '
                         SET fo_util = A.zd_fo_util,
                             reserve = A.reserve  --------- new 2 --------
 
                         FROM (
                             SELECT f.this_id, zd_fo_util, 
                             (SUM(f2.reserve) + (Case when z.zd_fo_util IS NOT NULL then z.zd_fo_util else 0 End)) as reserve ------------------- new 3 -----------------------
-                            FROM prod.p_cheminement_' || sro || ' f
-                            LEFT JOIN prod.p_cheminement_' || sro || ' f2 ON ST_DWITHIN(ST_EndPoint(f.geom), ST_StartPoint(f2.geom), 0.0001)
+                            FROM temp.p_cheminement_' || sro || ' f
+                            LEFT JOIN temp.p_cheminement_' || sro || ' f2 ON ST_DWITHIN(ST_EndPoint(f.geom), ST_StartPoint(f2.geom), 0.0001)
                             LEFT JOIN prod.p_ebp e ON ST_DWITHIN(ST_EndPoint(f.geom), e.geom, 0.0001)
                             LEFT JOIN prod.p_zdep z ON e.bp_id = z.zd_r6_code
                             WHERE f2.this_id IS NULL AND e.bp_id IS NOT NULL AND e.bp_pttype <> 7
                             GROUP BY f.this_id, f.rang, z.zd_fo_util
                             ORDER BY f.this_id
                             ) AS A
-                        WHERE prod.p_cheminement_' || sro || '.this_id = A.this_id';*/
+                        WHERE temp.p_cheminement_' || sro || '.this_id = A.this_id';*/
 
 
                 --------------------------------------------------------------------------------------------
 
 
-                DROP TABLE IF EXISTS prod.p_cheminement_tbr;
-                CREATE TABLE prod.p_cheminement_tbr (gid serial, rang integer, this_id integer, fo_util integer, reserve integer, geom Geometry(Linestring,2154));
-                EXECUTE 'INSERT INTO prod.p_cheminement_tbr SELECT * FROM prod.p_cheminement_' || sro; 
+                DROP TABLE IF EXISTS temp.p_cheminement_tbr;
+                CREATE TABLE temp.p_cheminement_tbr (gid serial, rang integer, this_id integer, fo_util integer, reserve integer, geom Geometry(Linestring,2154));
+                EXECUTE 'INSERT INTO temp.p_cheminement_tbr SELECT * FROM temp.p_cheminement_' || sro; 
 
-                    For id in (Select gid from prod.p_cheminement_tbr WHERE fo_util IS NULL order by rang DESC) loop
+                    For id in (Select gid from temp.p_cheminement_tbr WHERE fo_util IS NULL order by rang DESC) loop
                     
-                     EXECUTE 'UPDATE prod.p_cheminement_' || sro || ' c SET fo_util = (Select (SUM(c2.fo_util) + (Case when (Select SUM(z.zd_fo_util)
+                     EXECUTE 'UPDATE temp.p_cheminement_' || sro || ' c SET fo_util = (Select (SUM(c2.fo_util) + (Case when (Select SUM(z.zd_fo_util)
                      FROM prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) IS NOT NULL 
                      THEN (Select SUM(z.zd_fo_util) from prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) else 0 End )) As fo_util 
-                     FROM prod.p_cheminement_' || sro || ' c2 WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001)),
+                     FROM temp.p_cheminement_' || sro || ' c2 WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001)),
                      reserve = (Select (SUM(c2.reserve) + (Case when (Select SUM(z.zd_fo_util)
                      FROM prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) IS NOT NULL 
                      THEN (Select SUM(z.zd_fo_util) from prod.p_ebp e LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) ) else 0 End )) As fo_util 
-                     FROM prod.p_cheminement_' || sro || ' c2 WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001))
+                     FROM temp.p_cheminement_' || sro || ' c2 WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001))
 
                      WHERE c.gid = $1' USING id.gid;
-                     --EXECUTE 'UPDATE prod.p_cheminement_' || sro || ' c SET fo_util = (Select (SUM(c2.fo_util) + (Case when z.zd_fo_util IS NOT NULL then z.zd_fo_util else 0 End)) As fo_util FROM prod.p_cheminement_' || sro || ' c2 LEFT JOIN prod.p_ebp e ON ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001) GROUP BY z.zd_fo_util) WHERE c.gid = $1' USING id.gid;
+                     --EXECUTE 'UPDATE temp.p_cheminement_' || sro || ' c SET fo_util = (Select (SUM(c2.fo_util) + (Case when z.zd_fo_util IS NOT NULL then z.zd_fo_util else 0 End)) As fo_util FROM temp.p_cheminement_' || sro || ' c2 LEFT JOIN prod.p_ebp e ON ST_Dwithin(e.geom,St_EndPoint(c.geom),0.0001) LEFT JOIN prod.p_zdep z ON e.bp_id = zd_r6_code WHERE ST_Dwithin(St_StartPoint(c2.geom),St_EndPoint(c.geom),0.0001) GROUP BY z.zd_fo_util) WHERE c.gid = $1' USING id.gid;
                     END LOOP;
 
 
                 --------------------------------------------------------------------------------------
 
 
-                EXECUTE 'UPDATE temp.cheminement_' || sro || ' SET cm_fo_util = temp_chemin.reserve FROM prod.p_cheminement_' || sro || ' AS temp_chemin WHERE cm_id = temp_chEmin.this_id';
+                EXECUTE 'UPDATE temp.cheminement_' || sro || ' SET cm_fo_util = temp_chemin.reserve FROM temp.p_cheminement_' || sro || ' AS temp_chemin WHERE cm_id = temp_chEmin.this_id';
                     
-                -- DROP TABLE IF EXISTS prod.p_cheminement_tbr;
+                -- DROP TABLE IF EXISTS temp.p_cheminement_tbr;
                                         
                 END;
                 $$ language plpgsql;
@@ -977,44 +977,44 @@ class AutomaticDimensioning:
                     id_b bigint;
 
                     BEGIN
-                    DROP TABLE IF EXISTS prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """;
-                    CREATE TABLE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (cluster_id serial, ids bigint[], geom geometry);
-                    CREATE INDEX ON prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ USING GIST(geom);
+                    DROP TABLE IF EXISTS temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """;
+                    CREATE TABLE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (cluster_id serial, ids bigint[], geom geometry);
+                    CREATE INDEX ON temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ USING GIST(geom);
 
                     -- Iterate through linestrings, assigning each to a cluster (if there is an intersection)
                     -- or creating a new cluster (if there is not)
                     -- We limit the query to only the concerning ZSRO
                     FOR this_id, this_geom IN (SELECT cm_id, geom FROM prod.p_cheminement WHERE cm_zs_code like '%""" + zs_refpm.split("_")[2] + """%') LOOP
                       -- Look for an intersecting cluster.  (There may be more than one.)
-                      SELECT cluster_id FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE ST_Intersects(this_geom, prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.geom)
+                      SELECT cluster_id FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE ST_Intersects(this_geom, temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.geom)
                          LIMIT 1 INTO cluster_id_match;
 
                       IF cluster_id_match IS NULL THEN
                          -- Create a new cluster
-                         INSERT INTO prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (ids, geom) VALUES (ARRAY[this_id], this_geom);
+                         INSERT INTO temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (ids, geom) VALUES (ARRAY[this_id], this_geom);
                       ELSE
                          -- Append line to existing cluster
-                         UPDATE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ SET geom = ST_Union(this_geom, geom),
+                         UPDATE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ SET geom = ST_Union(this_geom, geom),
                                               ids = array_prepend(this_id, ids)
-                         WHERE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.cluster_id = cluster_id_match;
+                         WHERE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.cluster_id = cluster_id_match;
                       END IF;
                     END LOOP;
 
-                    -- Iterate through the prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """, combining prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ that intersect each other
+                    -- Iterate through the temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """, combining temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ that intersect each other
                     LOOP
-                        SELECT a.cluster_id, b.cluster_id FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a, prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b 
+                        SELECT a.cluster_id, b.cluster_id FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a, temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b 
                          WHERE ST_Intersects(a.geom, b.geom)
                            AND a.cluster_id < b.cluster_id
                           INTO id_a, id_b;
 
                         EXIT WHEN id_a IS NULL;
                         -- Merge cluster A into cluster B
-                        UPDATE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a SET geom = ST_Union(a.geom, b.geom), ids = array_cat(a.ids, b.ids)
-                          FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b
+                        UPDATE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a SET geom = ST_Union(a.geom, b.geom), ids = array_cat(a.ids, b.ids)
+                          FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b
                          WHERE a.cluster_id = id_a AND b.cluster_id = id_b;
 
                         -- Remove cluster B
-                        DELETE FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE cluster_id = id_b;
+                        DELETE FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE cluster_id = id_b;
                     END LOOP;
                     END;
                     $$ language plpgsql;"""
@@ -1030,44 +1030,44 @@ class AutomaticDimensioning:
                         id_b bigint;
 
                         BEGIN
-                        DROP TABLE IF EXISTS prod.cm_continuite_""" + zs_refpm.split("_")[2].lower().lower() + """;
-                        CREATE TABLE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (cluster_id serial, ids bigint[], geom geometry);
-                        CREATE INDEX ON prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ USING GIST(geom);
+                        DROP TABLE IF EXISTS temp.cm_continuite_""" + zs_refpm.split("_")[2].lower().lower() + """;
+                        CREATE TABLE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (cluster_id serial, ids bigint[], geom geometry);
+                        CREATE INDEX ON temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ USING GIST(geom);
 
                         -- Iterate through linestrings, assigning each to a cluster (if there is an intersection)
                         -- or creating a new cluster (if there is not)
                         -- We limit the query to only the concerning ZSRO
                         FOR this_id, this_geom IN (SELECT cm_id, geom FROM prod.p_cheminement WHERE cm_zs_code like '%""" + zs_refpm.split("_")[2].lower() + """%') LOOP
                           -- Look for an intersecting cluster.  (There may be more than one.)
-                          SELECT cluster_id FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE ST_Intersects(this_geom, prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.geom)
+                          SELECT cluster_id FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE ST_Intersects(this_geom, temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.geom)
                              LIMIT 1 INTO cluster_id_match;
 
                           IF cluster_id_match IS NULL THEN
                              -- Create a new cluster
-                             INSERT INTO prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (ids, geom) VALUES (ARRAY[this_id], this_geom);
+                             INSERT INTO temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (ids, geom) VALUES (ARRAY[this_id], this_geom);
                           ELSE
                              -- Append line to existing cluster
-                             UPDATE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ SET geom = ST_Union(this_geom, geom),
+                             UPDATE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ SET geom = ST_Union(this_geom, geom),
                                                   ids = array_prepend(this_id, ids)
-                             WHERE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.cluster_id = cluster_id_match;
+                             WHERE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.cluster_id = cluster_id_match;
                           END IF;
                         END LOOP;
 
-                        -- Iterate through the prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """, combining prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ that intersect each other
+                        -- Iterate through the temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """, combining temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ that intersect each other
                         LOOP
-                            SELECT a.cluster_id, b.cluster_id FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a, prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b 
+                            SELECT a.cluster_id, b.cluster_id FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a, temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b 
                              WHERE ST_Intersects(a.geom, b.geom)
                                AND a.cluster_id < b.cluster_id
                               INTO id_a, id_b;
 
                             EXIT WHEN id_a IS NULL;
                             -- Merge cluster A into cluster B
-                            UPDATE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a SET geom = ST_Union(a.geom, b.geom), ids = array_cat(a.ids, b.ids)
-                              FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b
+                            UPDATE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a SET geom = ST_Union(a.geom, b.geom), ids = array_cat(a.ids, b.ids)
+                              FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b
                              WHERE a.cluster_id = id_a AND b.cluster_id = id_b;
 
                             -- Remove cluster B
-                            DELETE FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE cluster_id = id_b;
+                            DELETE FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE cluster_id = id_b;
                         END LOOP;
                         END;
                         $$ language plpgsql;"""
@@ -1077,7 +1077,7 @@ class AutomaticDimensioning:
         self.executerRequette(query_topo, False)
         self.fenetreMessage(QMessageBox, "Success", "Topology has been verified")
         try:
-            self.add_pg_layer("prod", "cm_continuite_" + zs_refpm.split("_")[2].lower())
+            self.add_pg_layer("temp", "cm_continuite_" + zs_refpm.split("_")[2].lower())
         except Exception as e:
             self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
             # self.fenetreMessage(QMessageBox, "Success", "The topology verification layer wasn't added to the map")
