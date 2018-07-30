@@ -1348,8 +1348,9 @@ class AutomaticDimensioning:
 
     def ft_bt(self, zs_refpm):
         query = """UPDATE temp.cable_""" + zs_refpm.split("_")[2] + """ set ft_bt = case
-            WHEN 0 = ANY(subquery.array_pt_code) or 12 = any(subquery.array_pt_code) THEN 'FT'
-            ELSE 'BT'
+            --WHEN 0 = ANY(subquery.array_pt_code) or 12 = any(subquery.array_pt_code) THEN 'FT'
+            WHEN 1 = ANY(subquery.array_pt_code) or 2 = any(subquery.array_pt_code) THEN 'BT'
+            ELSE 'FT'
             END    
             FROM (select cable.id, array_agg(ptech.pt_id), array_agg(ptech.pt_code) as array_pt_code
             FROM temp.cable_""" + zs_refpm.split("_")[2] + """ as cable join prod.p_ptech as ptech on ST_DWithin(cable.geom, ptech.geom, 0.0001)
