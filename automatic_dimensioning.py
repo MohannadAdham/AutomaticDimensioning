@@ -1354,7 +1354,7 @@ class AutomaticDimensioning:
             END    
             FROM (select cable.id, array_agg(ptech.pt_id), array_agg(ptech.pt_code) as array_pt_code
             FROM temp.cable_""" + zs_refpm.split("_")[2] + """ as cable join prod.p_ptech as ptech on ST_DWithin(cable.geom, ptech.geom, 0.0001)
-            WHERE ptech.pt_code < 6 or ptech.pt_code = 12
+            WHERE ptech.pt_code < 6 or ptech.pt_code in (10, 11, 12)
             GROUP BY cable.id) as subquery
 
             WHERE temp.cable_""" + zs_refpm.split("_")[2] + """.id = subquery.id; """
