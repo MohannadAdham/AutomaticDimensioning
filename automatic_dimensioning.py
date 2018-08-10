@@ -110,8 +110,8 @@ class AutomaticDimensioning:
         QObject.connect(Button_fibres_utiles, SIGNAL("clicked()"), self.calcul_fibres_utiles)
 
         # Connect the button "pushButton_"
-        Button_dimensios = self.dlg.findChild(QPushButton, "pushButton_dimensions")
-        QObject.connect(Button_dimensios, SIGNAL("clicked()"), self.calcul_cable_dimensions)
+        Button_dimensions = self.dlg.findChild(QPushButton, "pushButton_dimensions")
+        QObject.connect(Button_dimensions, SIGNAL("clicked()"), self.calcul_cable_dimensions)
 
         # Connect the butoon "pushButton_mettre_a_jour_chemin"
         Button_mettre_a_jour_chemin = self.dlg.findChild(QPushButton, "pushButton_mettre_a_jour_chemin")
@@ -208,8 +208,9 @@ class AutomaticDimensioning:
 
     def run(self):
         """Run method that performs all the real work"""
-        # show the dialog
         self.GetParamBD(self.dlg.lineEdit_BD, self.dlg.lineEdit_Password, self.dlg.lineEdit_User, self.dlg.lineEdit_Host, self.dlg.Schema_grace)
+
+        # show the dialog
         self.dlg.show()
 
         # Run the dialog event loop
@@ -333,7 +334,7 @@ class AutomaticDimensioning:
     def findMultiLineString(self):
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
 
-        query = "SELECT id FROM temp.cable_" + zs_refpm.split("_")[2].lower()  + " WHERE ST_GeometryType(geom) = 'ST_MultiLineString'"
+        query = "SELECT id FROM temp.cable_" + zs_refpm.split("_")[2].lower()  + " WHERE ST_GeometryType(ST_LineMerge(geom)) = 'ST_MultiLineString'"
         result = self.executerRequette(query,  True)
         # return result[0][0]
         if len(result) > 0:
