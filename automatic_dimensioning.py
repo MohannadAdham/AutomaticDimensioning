@@ -744,76 +744,74 @@ class AutomaticDimensioning:
 
 
     def verify_topology(self):
-        ''' Check the connectivity between all the cheminements within the zsro.
-        Adds a table to the project that should have only one record in case of success '''
-
         # zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
 
         # self.fenetreMessage(QMessageBox, "Success", "Topology will be verified")
+        query_topo = """DO
+                    $$
+                    DECLARE
+                    this_id bigint;
+                    this_geom geometry;
+                    cluster_id_match integer;
 
-        query_topo_new = """DO
-                        $$
-                        DECLARE
-                        this_id bigint;
-                        this_geom geometry;
-                        cluster_id_match integer;
+                    id_a bigint;
+                    id_b bigint;
 
-                        id_a bigint;
-                        id_b bigint;
+                    BEGIN
+                    DROP TABLE IF EXISTS prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """;
+                    CREATE TABLE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (cluster_id serial, ids bigint[], geom geometry);
+                    CREATE INDEX ON prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ USING GIST(geom);
 
-                        BEGIN
-                        DROP TABLE IF EXISTS temp.cm_continuite_""" + zs_refpm.split("_")[2].lower().lower() + """;
-                        CREATE TABLE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (cluster_id serial, ids bigint[], geom geometry);
-                        CREATE INDEX ON temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ USING GIST(geom);
+                    -- Iterate through linestrings, assigning each to a cluster (if there is an intersection)
+                    -- or creating a new cluster (if there is not)
+                    -- We limit the query to only the concerning ZSRO
+                    FOR this_id, this_geom IN (SELECT cm_id, geom FROM prod.p_cheminement WHERE cm_zs_code like '%""" + zs_refpm.split("_")[2] + """%') LOOP
+                      -- Look for an intersecting cluster.  (There may be more than one.)
+                      SELECT cluster_id FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE ST_Intersects(this_geom, prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.geom)
+                         LIMIT 1 INTO cluster_id_match;
 
-                        -- Iterate through linestrings, assigning each to a cluster (if there is an intersection)
-                        -- or creating a new cluster (if there is not)
-                        -- We limit the query to only the concerning ZSRO
-                        FOR this_id, this_geom IN (SELECT cm_id, geom FROM prod.p_cheminement WHERE cm_zs_code like '%""" + zs_refpm.split("_")[2].lower() + """%') LOOP
-                          -- Look for an intersecting cluster.  (There may be more than one.)
-                          SELECT cluster_id FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE ST_Intersects(this_geom, temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.geom)
-                             LIMIT 1 INTO cluster_id_match;
+                      IF cluster_id_match IS NULL THEN
+                         -- Create a new cluster
+                         INSERT INTO prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (ids, geom) VALUES (ARRAY[this_id], this_geom);
+                      ELSE
+                         -- Append line to existing cluster
+                         UPDATE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ SET geom = ST_Union(this_geom, geom),
+                                              ids = array_prepend(this_id, ids)
+                         WHERE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.cluster_id = cluster_id_match;
+                      END IF;
+                    END LOOP;
 
-                          IF cluster_id_match IS NULL THEN
-                             -- Create a new cluster
-                             INSERT INTO temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (ids, geom) VALUES (ARRAY[this_id], this_geom);
-                          ELSE
-                             -- Append line to existing cluster
-                             UPDATE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ SET geom = ST_Union(this_geom, geom),
-                                                  ids = array_prepend(this_id, ids)
-                             WHERE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.cluster_id = cluster_id_match;
-                          END IF;
-                        END LOOP;
+                    -- Iterate through the prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """, combining prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ that intersect each other
+                    LOOP
+                        SELECT a.cluster_id, b.cluster_id FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a, prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b 
+                         WHERE ST_Intersects(a.geom, b.geom)
+                           AND a.cluster_id < b.cluster_id
+                          INTO id_a, id_b;
 
-                        -- Iterate through the temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """, combining temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ that intersect each other
-                        LOOP
-                            SELECT a.cluster_id, b.cluster_id FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a, temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b 
-                             WHERE ST_Intersects(a.geom, b.geom)
-                               AND a.cluster_id < b.cluster_id
-                              INTO id_a, id_b;
+                        EXIT WHEN id_a IS NULL;
+                        -- Merge cluster A into cluster B
+                        UPDATE prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a SET geom = ST_Union(a.geom, b.geom), ids = array_cat(a.ids, b.ids)
+                          FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b
+                         WHERE a.cluster_id = id_a AND b.cluster_id = id_b;
 
-                            EXIT WHEN id_a IS NULL;
-                            -- Merge cluster A into cluster B
-                            UPDATE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a SET geom = ST_Union(a.geom, b.geom), ids = array_cat(a.ids, b.ids)
-                              FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b
-                             WHERE a.cluster_id = id_a AND b.cluster_id = id_b;
-
-                            -- Remove cluster B
-                            DELETE FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE cluster_id = id_b;
-                        END LOOP;
-                        END;
-                        $$ language plpgsql;"""
+                        -- Remove cluster B
+                        DELETE FROM prod.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE cluster_id = id_b;
+                    END LOOP;
+                    END;
+                    $$ language plpgsql;"""
 
 
+        # self.fenetreMessage(QMessageBox, "info", query_topo)
         self.executerRequette(query_topo, False)
         self.fenetreMessage(QMessageBox, "Success", "Topology has been verified")
         try:
-            self.add_pg_layer("temp", "cm_continuite_" + zs_refpm.split("_")[2].lower())
+            self.add_pg_layer("prod", "cm_continuite_" + zs_refpm.split("_")[2].lower())
         except Exception as e:
             self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
             # self.fenetreMessage(QMessageBox, "Success", "The topology verification layer wasn't added to the map")
         # self.fenetreMessage(QMessageBox, "Success", "The topology verification layer is added to the map")
+
 
 
     def add_pg_layer(self, schema, table_name):
@@ -840,8 +838,11 @@ class AutomaticDimensioning:
         layer_names = [layer.name() for layer in QgsMapLayerRegistry.instance().mapLayers().values()]
         if table_name not in layer_names:
             # Add the vector layer to the map
-            QgsMapLayerRegistry.instance().addMapLayers([vlayer])
-            self.fenetreMessage(QMessageBox, "Success", "Layer %s is loaded" % vlayer.name())
+            try:
+                QgsMapLayerRegistry.instance().addMapLayers([vlayer])
+                self.fenetreMessage(QMessageBox, "Success", "Layer %s is loaded" % vlayer.name())
+            except Exception as e:
+                self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
 
         else :
             self.fenetreMessage(QMessageBox, "Success", "Layer %s already exists but it has been updated" % vlayer.name())
