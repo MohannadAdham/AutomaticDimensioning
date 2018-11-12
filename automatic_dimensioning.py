@@ -1108,7 +1108,7 @@ class AutomaticDimensioning:
                 SET type_cable = subquery.case from  (SELECT id, fb_utile, aer_sou, CASE
                     -- WHEN cable.capacite < 432 AND cable.aer_sou = 'S' THEN 'FOS SILEC'
                     -- The new type of cables (TKF)
-                    WHEN cable.capacity < 432 AND cable.aer_sou = 'S' THEN 'FO TKF'
+                    WHEN cable.capacite < 432 AND cable.aer_sou = 'S' THEN 'FO TKF'
                     WHEN cable.capacite = 432 AND cable.aer_sou = 'S' THEN 'FOS ACOME'
                     WHEN cable.capacite >= 432 AND cable.aer_sou = 'S' THEN 'FOS PRYSMIAN'
                     WHEN cable.capacite > 288 AND cable.aer_sou = 'A' THEN 'WARNING!!!'
