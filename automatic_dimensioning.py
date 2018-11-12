@@ -90,8 +90,10 @@ class AutomaticDimensioning:
         # Create the dialog (after translation) and keep reference
         self.dlg = AutomaticDimensioningDialog()
 
-#"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""" lsitner autojmatic dimensioning """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+#"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""" Connect the buttons to the corresponding methods """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
         
+        
+
         #creation du bouton "connexion BD"
         Button_connexion_BD= self.dlg.findChild(QPushButton,"pushButton_connexion")
         QObject.connect(Button_connexion_BD, SIGNAL("clicked()"),self.connectToDb)
@@ -126,10 +128,9 @@ class AutomaticDimensioning:
 
 
 
-#"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""" Listner migration P vers T """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+#""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""        """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 
-    # noinspection PyMethodMayBeStatic
     def tr(self, message):
         """Get the translation for a string using Qt translation API.
 
@@ -197,6 +198,7 @@ class AutomaticDimensioning:
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
+
         for action in self.actions:
             self.iface.removePluginMenu(
                 self.tr(u'&Automatic Dimensioning'),
@@ -208,15 +210,13 @@ class AutomaticDimensioning:
 
     def run(self):
         """Run method that performs all the real work"""
-        self.GetParamBD(self.dlg.lineEdit_BD, self.dlg.lineEdit_Password, self.dlg.lineEdit_User, self.dlg.lineEdit_Host, self.dlg.Schema_grace)
 
+        self.GetParamBD(self.dlg.lineEdit_BD, self.dlg.lineEdit_Password, self.dlg.lineEdit_User, self.dlg.lineEdit_Host, self.dlg.Schema_grace)
         # show the dialog
         self.dlg.show()
-
         # Run the dialog event loop
         result = self.dlg.exec_()
         # See if OK was pressed
-
         # Activate the connection button 
         self.dlg.findChild(QPushButton, "pushButton_connexion").setEnabled(True)
         if result:
@@ -228,6 +228,8 @@ class AutomaticDimensioning:
 
 
     def fenetreMessage(self,typeMessage,titre,message):
+        ''' Displays a message box to the user '''
+
         try:
             msg = QMessageBox()
             # msg.setIcon(typeMessage)
@@ -240,6 +242,8 @@ class AutomaticDimensioning:
 
             
     def GetParamBD(self, dbname, password, user, serveur, sche):
+        ''' Looks for the information to connect to the DB within the QGIS project '''
+
         try:
             path_absolute = QgsProject.instance().fileName()
             
@@ -289,6 +293,8 @@ class AutomaticDimensioning:
 
 
     def remplir_menu_deroulant_reference(self, combobox, rq_sql, DefValChamp):
+        ''' Fill a combobox with a list of table names '''
+
         listVal = []
         combobox.clear()
         result = self.executerRequette(rq_sql, True)
@@ -304,8 +310,9 @@ class AutomaticDimensioning:
 
 
     def executerRequette(self, Requette, boool):
-        global conn
-        
+        ''' Sends a query to execute it within the database and receives the results '''
+
+        global conn        
         try:
             cursor = conn.cursor()
             cursor.execute(Requette)
@@ -331,7 +338,10 @@ class AutomaticDimensioning:
                 self.isMultistring = True
                 self.findMultiLineString()
 
+
     def findMultiLineString(self):
+        ''' Finds the features that have a multilinstring geometry type and add them as a layer within the project '''
+
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
 
         query = "SELECT id FROM temp.cable_" + zs_refpm.split("_")[2].lower()  + " WHERE ST_GeometryType(ST_LineMerge(geom)) = 'ST_MultiLineString'"
@@ -360,6 +370,7 @@ class AutomaticDimensioning:
 
 
     def connectToDb(self):
+        ''' Connects to the DB, enables the comboboxes and the buttons, and fill the comboboxes with the names of the tables '''
         global conn
         Host = self.dlg.lineEdit_Host.text()
         DBname = self.dlg.lineEdit_BD.text()
@@ -422,14 +433,10 @@ class AutomaticDimensioning:
                 # 3 - ZSRO (zs_refpm)
                 self.remplir_menu_deroulant_reference(self.dlg.comboBox_zs_refpm, ("SELECT zs_refpm as refpm FROM " + self.dlg.Schema_prod.text() + ".p_zsro ;"), 'PMT_26325_FO01')
 
-                # print "SELECT zs_refpm FROM " + self.dlg.Schema_grace.text() + ".t_zsro;"
-
 
                 print "Schema found"
-                # self.dlg2.findChild(QPushButton,"pushButton_controle_avt_migration").setEnabled(True)
             else:
                 # self.dlg2.findChild(QPushButton,"pushButton_controle_avt_migration").setEnabled(False)
-                # self.dlg2.findChild(QPushButton,"pushButton_migration").setEnabled(False)
                 print "Schema not found"
         except Exception as e:
                 pass
@@ -441,6 +448,9 @@ class AutomaticDimensioning:
 
 
     def calcul_orientation(self):
+        ''' Determines the orientation of the cheminements within the the temporary table, adds the resulted table
+        as a layer to the project and styles it '''
+
         message =  "calcu_orientation function"
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         self.fenetreMessage(QMessageBox, "Successful!", message)
@@ -456,182 +466,6 @@ class AutomaticDimensioning:
         self.create_temp_table(schema_name, table_name, zs_refpm)
 
         # The SQL query for determining the orientation of conduites
-        query = """DO
-                $$
-                DECLARE
-                counter integer = 1;
-                rang_fibre integer;
-                id record;
-
-                BEGIN
-
-                    DROP TABLE IF EXISTS temp.clusters;
-                    CREATE TABLE temp.clusters (gid serial, this_id integer, rang integer, geom Geometry(Linestring,2154));  
-                    CREATE INDEX clusters_geom_gist ON temp.clusters USING GIST (geom); 
-
-                    INSERT INTO temp.clusters(this_id, rang, geom)   
-                    SELECT c.cm_id, counter, c.geom
-                    FROM prod.p_cheminement c, prod.p_sitetech s 
-                    WHERE ST_INTERSECTS(c.geom, s.geom) AND st_id = 4;
-
-                    FOR id IN (SELECT cm_id FROM prod.p_cheminement WHERE cm_zs_code LIKE '%""" + zs_refpm.split("_")[2].lower() + """%')
-
-                    LOOP
-                    
-                    counter = counter + 1;
-                    
-                    INSERT INTO temp.clusters(this_id, rang, geom)
-                    SELECT c.cm_id, counter, c.geom
-                    FROM prod.p_cheminement c, temp.clusters l
-                    WHERE l.rang = (counter - 1) AND St_DWithin(c.geom, l.geom, 0.0001) AND c.cm_id NOT IN (SELECT this_id FROM temp.clusters)
-                     AND c.cm_zs_code LIKE '%""" + zs_refpm.split("_")[2].lower() + """%';
-                       
-                    UPDATE temp.clusters
-                    SET geom = ST_Reverse(geom)
-                    WHERE this_id IN (
-                        SELECT a.this_id
-                        FROM (
-                            SELECT a.this_id, CASE
-                                          WHEN (St_Dwithin(ST_ENDPoint(a.geom), ST_ENDPoint(b.geom),0.0001))
-                                           OR (St_Dwithin(ST_StartPoint(a.geom), ST_StartPoint(b.geom),0.0001)) Then 'NOK' 
-                                           ELSE 'OK'
-                                        END as sens
-                            FROM temp.clusters a
-                            LEFT JOIN (SELECT * FROM temp.clusters WHERE rang = (counter - 1)) b ON St_Dwithin(a.geom, b.geom, 0.0001)
-                            WHERE a.rang = counter
-                        ) AS a
-                        WHERE a.sens = 'NOK'
-                        );
-                        
-                    END LOOP;
-
-                    DELETE FROM temp.clusters WHERE gid IN (
-                                    SELECT gid--, this_id, quantite
-                                    FROM (
-                                        SELECT gid, this_id, ROW_NUMBER() OVER(PARTITION BY this_id ORDER BY this_id) as quantite
-                                        FROM temp.clusters
-                                        WHERE this_id IN (SELECT this_id FROM temp.clusters GROUP BY this_id HAVING count(this_id) > 1)
-                                        ) AS A 
-                                    WHERE quantite > 1
-                                    ORDER BY this_id
-                                    );
-
-                UPDATE temp.cheminement_""" + zs_refpm.split("_")[2].lower() + """
-                    SET geom = A.geom
-                    FROM (
-                        SELECT this_id, geom
-                        FROM temp.clusters
-                         ) as A
-                    WHERE temp.cheminement_""" + zs_refpm.split("_")[2].lower() + """.cm_id = a.this_id;
-                                    
-
-                END;
-                $$ language plpgsql;"""
-
-
-                ############################## Important: pay attention to the number of sitetech (st_id). We should get it dynamically from the table p_ltech ###############
-                ########################### We should also check the connectivity between the cheminements and the sitetech ##################################################
-                ########################### Other possibility: The first cheminement after the site technique has fauty direction ############################################
-                ########################## Other possibility: There are cheminement assigned an incorrect values of zs_code ##################################################
-
-
-        query2 = """DO
-                $$
-                DECLARE
-                counter integer = 1 ;
-                rang_fibre integer;
-                id record ;
-                id2 record ;
-
-                BEGIN
-
-                    DROP TABLE IF EXISTS temp.clusters;
-                    CREATE TABLE temp.clusters (gid serial, this_id integer, rang integer, geom Geometry(Linestring,2154));
-                    DROP TABLE IF EXISTS temp.clusters2;
-                    CREATE TABLE temp.clusters2 (gid serial, that_id integer);
-                    DROP TABLE IF EXISTS temp.clusters3;
-                    CREATE TABLE temp.clusters3 (gid serial, that_id integer);   
-                    CREATE INDEX clusters_geom_gist ON temp.clusters USING GIST (geom);  
-                    INSERT INTO temp.clusters(this_id, rang, geom)   
-                    SELECT c.cm_id, counter, c.geom
-                    FROM prod.p_cheminement c, prod.p_sitetech s 
-                    WHERE ST_INTERSECTS(c.geom, s.geom) AND st_id = 2;
-
-                    FOR id IN (SELECT cm_id FROM prod.p_cheminement WHERE cm_zs_code LIKE '%""" + zs_refpm.split("_")[2] + """%')
-
-                    LOOP
-                    
-                    counter = counter + 1;
-                    
-                    INSERT INTO temp.clusters(this_id, rang, geom)
-                    SELECT c.cm_id, counter, c.geom
-                    FROM prod.p_cheminement c, temp.clusters l
-                    WHERE l.rang = (counter - 1) AND (St_DWITHIN(St_StartPoint(c.geom), St_StartPoint(l.geom),0.0001) 
-                    OR St_DWITHIN(St_StartPoint(c.geom), St_Endpoint(l.geom),0.0001) 
-                    OR St_DWITHIN(St_EndPoint(c.geom), St_StartPoint(l.geom),0.0001) 
-                    OR St_DWITHIN(St_EndPoint(c.geom), St_EndPoint(l.geom),0.0001)) 
-                    AND c.cm_id NOT IN (SELECT this_id FROM temp.clusters) AND c.cm_zs_code LIKE '%""" + zs_refpm.split("_")[2] + """%';
-                       
-                    
-                    END LOOP;
-
-                    DELETE FROM temp.clusters WHERE gid IN (
-                                    SELECT gid--, this_id, quantite
-                                    FROM (
-                                        SELECT gid, this_id, ROW_NUMBER() OVER(PARTITION BY this_id ORDER BY this_id) as quantite
-                                        FROM temp.clusters
-                                        WHERE this_id IN (SELECT this_id FROM temp.clusters GROUP BY this_id HAVING count(this_id) > 1)
-                                        ) AS A 
-                                    WHERE quantite > 1
-                                    ORDER BY this_id
-                                    );
-
-
-                For id in (Select * from temp.clusters order by gid) loop
-                For id2 in (select * from temp.clusters where (St_DWITHIN(St_StartPoint(id.geom), St_StartPoint(geom),0.0001)
-                 OR St_DWITHIN(St_StartPoint(id.geom), St_Endpoint(geom),0.0001) 
-                 OR St_DWITHIN(St_EndPoint(id.geom), St_StartPoint(geom),0.0001) OR St_DWITHIN(St_EndPoint(id.geom), St_EndPoint(geom),0.0001)) 
-                 and id.rang = (rang - 1)) loop
-                If St_Dwithin((Select St_EndPoint(geom) from temp.clusters where gid = id.gid),
-                (Select St_EndPoint(geom) from temp.clusters where gid = id2.gid),0.0001) IS TRUE then
-                --RAISE EXCEPTION USING MESSAGE = (id,id2);
-                --IF id2.this_id IN (Select that_id from temp.clusters2) then RAISE EXCEPTION USING MESSAGE = (that_id); End If;
-                --RAISE EXCEPTION USING MESSAGE = (id,id2);
-
-                IF id2.this_id IN (Select that_id from temp.clusters2) then 
-                INSERT INTO temp.clusters3 (that_id) VALUES (id2.this_id);
-                End If;
-                INSERT INTO temp.clusters2 (that_id) VALUES (id2.this_id);
-                UPDATE temp.clusters SET geom = ST_Reverse(geom) where this_id = id2.this_id;
-                End If;
-                End loop;
-                End loop;
-
-                        
-                UPDATE temp.cheminement_""" + zs_refpm.split("_")[2] + """
-                    SET geom = A.geom
-                    FROM (
-                        SELECT this_id, geom
-                        FROM temp.clusters
-                         ) as A
-                    WHERE temp.cheminement_""" + zs_refpm.split("_")[2] + """.cm_id = a.this_id;
-
-                DELETE FROM temp.clusters WHERE gid IN (
-                                    SELECT gid--, this_id, quantite
-                                    FROM (
-                                        SELECT gid, this_id, ROW_NUMBER() OVER(PARTITION BY this_id ORDER BY this_id) as quantite
-                                        FROM temp.clusters
-                                        WHERE this_id IN (SELECT this_id FROM temp.clusters GROUP BY this_id HAVING count(this_id) > 1)
-                                        ) AS A 
-                                    WHERE quantite > 1
-                                    ORDER BY this_id
-                                    );
-
-                                    
-                END;
-                $$ language plpgsql;
-                Select * from temp.clusters3;"""
-
 
 
 
@@ -732,17 +566,27 @@ class AutomaticDimensioning:
                                     
                 END;
                 $$ language plpgsql;
+
+                -- The remaining records within clusters3 are loops in the infrastructure
                 Select * from temp.clusters3;
 
 
         """
+        ############################## Important: pay attention to the number of sitetech (st_id). We should get it dynamically from the table p_ltech ###############
+        ########################### We should also check the connectivity between the cheminements and the sitetech ##################################################
+        ########################### Other possibility: The first cheminement after the site technique has fauty direction ############################################
+        ########################## Other possibility: There are cheminement assigned an incorrect values of zs_code ##################################################
 
-
-        # self.fenetreMessage(QMessageBox, "info", query3)
+        # Execute the query that determines the orientation of the cables
         result = self.executerRequette(query3, True)
+
+        # Add the layer to the project
         self.add_pg_layer("temp", "cheminement_" + zs_refpm.split("_")[2].lower())
+
+        # Copy the style of the layer "cheminement" to the newly added layer
         self.copy_style("p_cheminement", "cheminement_" + zs_refpm.split("_")[2].lower())
 
+        # Check for loops in the infrastructure
         if len(result) > 0:
                 message2 = "You have " + str(len(result)) + " loops in your network at cheminements " + str(result[0][1])
                 for i in range(1, len(result)):
@@ -751,9 +595,7 @@ class AutomaticDimensioning:
                     else :
                         message2 += " and " + str(result[i][1])
 
-                # self.fenetreMessage(QMessageBox, "Warning!", "You have " + str(len(result)) + " loops in your network at cheminements " + str(result[0][1]) + " and " + str(result[1][1]))
-                # self.fenetreMessage(QMessageBox, "Warning!", message2)
-                # self.fenetreMessage(QMessageBox, "Warning!", str(result))
+
         else:
             self.fenetreMessage(QMessageBox, "Successful!" ,"The table is oriented")
 
@@ -761,74 +603,12 @@ class AutomaticDimensioning:
 
 
     def calcul_fibres_utiles(self):
+        ''' Calculates the number of fibers per cheminement within the working table cheminement_* '''
+
         message = "calcul_fibres_utiles function"
         self.fenetreMessage(QMessageBox, "info" , message)
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         # zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
-
-
-        query = """DO
-                $$
-                DECLARE
-                counter integer = 1 ;
-                rang_fibre integer;
-                id record ;
-
-                BEGIN
-
-                     UPDATE temp.cheminement_""" + zs_refpm.split("_")[2] + """
-                     SET cm_fo_util = B.total_fibr
-                     FROM (
-                        SELECT c.cm_id as this_id, n.total_fibr 
-                        FROM temp.cheminement_""" + zs_refpm.split("_")[2] + """ c 
-                        LEFT JOIN (
-                                   SELECT n.nd_code, vs.total_fibr, n.geom 
-                                   FROM gracethd.t_noeud n, prod.vs_bal vs 
-                                   WHERE n.nd_code = vs.nd_code --AND vs.total_suf BETWEEN 1 AND 3
-                                   ) as n
-                        ON ST_DWithin(St_EndPoint(c.geom), n.geom, 0.0001)
-                        WHERE c.cm_zs_code LIKE '%""" + zs_refpm.split("_")[2] + """%' AND n.total_fibr IS NOT NULL 
-                         ) AS B
-                     WHERE temp.cheminement_""" + zs_refpm.split("_")[2] + """.cm_id = B.this_id;
-
-                    rang_fibre =    (
-                            SELECT rang
-                            FROM clusters
-                            WHERE this_id NOT IN (
-                                        SELECT c.cm_id as this_id--, n.total_fibr 
-                                        FROM temp.cheminement_""" + zs_refpm.split("_")[2] + """ c 
-                                        LEFT JOIN (
-                                               SELECT n.nd_code, vs.total_fibr, n.geom 
-                                               FROM gracethd.t_noeud n, prod.vs_bal vs 
-                                               WHERE n.nd_code = vs.nd_code --AND vs.total_suf BETWEEN 1 AND 3
-                                               ) as n
-                                        ON ST_DWithin(St_EndPoint(c.geom), n.geom, 0.0001)
-                                        WHERE c.cm_zs_code LIKE '%""" + zs_refpm.split("_")[2] + """%' AND n.total_fibr IS NOT NULL 
-                                        )
-                            ORDER BY rang desc
-                            LIMIT 1
-                            );
-
-                    WHILE rang_fibre >= 1 LOOP
-
-                    UPDATE temp.cheminement_""" + zs_refpm.split("_")[2] + """
-                    SET cm_fo_util = A.somme
-                    FROM (
-                        SELECT c.cm_id, l.rang, SUM(c2.cm_fo_util) as somme
-                        FROM temp.cheminement_""" + zs_refpm.split("_")[2] + """ c, clusters l,
-                         temp.cheminement_""" + zs_refpm.split("_")[2] + """ c2
-                        WHERE c.cm_id = l.this_id AND ST_DWITHIN(ST_EndPoint(c.geom), ST_StartPoint(c2.geom), 0.001) AND l.rang = rang_fibre
-                        GROUP BY c.cm_id, l.rang
-                        ) AS A
-                    WHERE temp.cheminement_""" + zs_refpm.split("_")[2] + """.cm_id = A.cm_id;
-
-                    rang_fibre = rang_fibre - 1;
-                    
-                    END LOOP;                    
-
-                END;
-                $$ language plpgsql;
-                """
 
 
         query2 = """
@@ -932,11 +712,9 @@ class AutomaticDimensioning:
 
 
 
-        # self.fenetreMessage(QMessageBox, "Successful!", query2)
 
         self.executerRequette(query2, False)
 
-        # self.fenetreMessage(QMessageBox, "Successful!", message)
 
         # Enable the button of cable dimensioning
         self.dlg.findChild(QPushButton, "pushButton_dimensions").setEnabled(True)
@@ -945,6 +723,9 @@ class AutomaticDimensioning:
     # ---------------------------------- needs to be modified --------------------------------------
 
     def create_temp_table(self, shema, table_name, zs_refpm):
+        ''' Creates a working table for the cheminments filtered by zs_refpm. The method is implemented for cheminment_* 
+        but we can generalize the body of the method to create any working table. '''
+
         # drop previous version if exists
         query_drop = "DROP TABLE IF EXISTS temp.Cheminement_" + zs_refpm.split("_")[2] + " CASCADE;"
         # self.fenetreMessage(QMessageBox, "Drop!", query_drop)
@@ -963,62 +744,13 @@ class AutomaticDimensioning:
 
 
     def verify_topology(self):
+        ''' Check the connectivity between all the cheminements within the zsro.
+        Adds a table to the project that should have only one record in case of success '''
+
         # zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
 
         # self.fenetreMessage(QMessageBox, "Success", "Topology will be verified")
-        query_topo = """DO
-                    $$
-                    DECLARE
-                    this_id bigint;
-                    this_geom geometry;
-                    cluster_id_match integer;
-
-                    id_a bigint;
-                    id_b bigint;
-
-                    BEGIN
-                    DROP TABLE IF EXISTS temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """;
-                    CREATE TABLE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (cluster_id serial, ids bigint[], geom geometry);
-                    CREATE INDEX ON temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ USING GIST(geom);
-
-                    -- Iterate through linestrings, assigning each to a cluster (if there is an intersection)
-                    -- or creating a new cluster (if there is not)
-                    -- We limit the query to only the concerning ZSRO
-                    FOR this_id, this_geom IN (SELECT cm_id, geom FROM prod.p_cheminement WHERE cm_zs_code like '%""" + zs_refpm.split("_")[2] + """%') LOOP
-                      -- Look for an intersecting cluster.  (There may be more than one.)
-                      SELECT cluster_id FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE ST_Intersects(this_geom, temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.geom)
-                         LIMIT 1 INTO cluster_id_match;
-
-                      IF cluster_id_match IS NULL THEN
-                         -- Create a new cluster
-                         INSERT INTO temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ (ids, geom) VALUES (ARRAY[this_id], this_geom);
-                      ELSE
-                         -- Append line to existing cluster
-                         UPDATE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ SET geom = ST_Union(this_geom, geom),
-                                              ids = array_prepend(this_id, ids)
-                         WHERE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """.cluster_id = cluster_id_match;
-                      END IF;
-                    END LOOP;
-
-                    -- Iterate through the temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """, combining temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ that intersect each other
-                    LOOP
-                        SELECT a.cluster_id, b.cluster_id FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a, temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b 
-                         WHERE ST_Intersects(a.geom, b.geom)
-                           AND a.cluster_id < b.cluster_id
-                          INTO id_a, id_b;
-
-                        EXIT WHEN id_a IS NULL;
-                        -- Merge cluster A into cluster B
-                        UPDATE temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ a SET geom = ST_Union(a.geom, b.geom), ids = array_cat(a.ids, b.ids)
-                          FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ b
-                         WHERE a.cluster_id = id_a AND b.cluster_id = id_b;
-
-                        -- Remove cluster B
-                        DELETE FROM temp.cm_continuite_""" + zs_refpm.split("_")[2].lower() + """ WHERE cluster_id = id_b;
-                    END LOOP;
-                    END;
-                    $$ language plpgsql;"""
 
         query_topo_new = """DO
                         $$
@@ -1074,7 +806,6 @@ class AutomaticDimensioning:
                         $$ language plpgsql;"""
 
 
-        # self.fenetreMessage(QMessageBox, "info", query_topo)
         self.executerRequette(query_topo, False)
         self.fenetreMessage(QMessageBox, "Success", "Topology has been verified")
         try:
@@ -1086,6 +817,8 @@ class AutomaticDimensioning:
 
 
     def add_pg_layer(self, schema, table_name):
+        ''' Adds a postgres geometry table as a layer to the QGIS project.'''
+
         # Create a data source URI
         uri = QgsDataSourceURI()
 
@@ -1116,6 +849,9 @@ class AutomaticDimensioning:
 
 
     def remove_raccord(self, zs_refpm):
+        ''' Removes the cheminements of type "Raccordement" from the working table cheminement_* 
+        and saves the result in a new working table. '''
+
         query_remove = """
                         DO
                         $$
@@ -1160,16 +896,14 @@ class AutomaticDimensioning:
 
                         $$ language plpgsql;"""
 
-        # self.fenetreMessage(QMessageBox, 'remove_raccord', query_remove)
         self.executerRequette(query_remove, False)
-        # self.fenetreMessage(QMessageBox, 'remove_raccord', 'after query')
-
-
 
 
 
 
     def create_cable_geom(self, schema, table_name, zs_refpm):
+        ''' Create a new working table that holds the geometry of the cables which results from fusioning the cheminements between each two boites. '''
+
         query_drop = "DROP TABLE IF EXISTS " + schema + "." + table_name + "_" + zs_refpm.split("_")[2] + ";"
         # self.fenetreMessage(QMessageBox, "Drop!", query_drop)
         self.executerRequette(query_drop, False)
@@ -1241,6 +975,8 @@ class AutomaticDimensioning:
                 (select id, fb_utile, CASE
                             WHEN fb_utile  <= 12 THEN 12 
                             WHEN fb_utile  > 12 AND fb_utile  <= 24 THEN 24
+                            -- WHEN fb_utile > 24 AND fb_utile <= 36 THEN 36
+                            -- WHEN fb_utile > 36 AND fb_utile <= 48 THEN 48
                             WHEN fb_utile  > 24 AND fb_utile  <= 48 THEN 48
                             WHEN fb_utile  > 48 AND fb_utile  <= 72 THEN 72
                             WHEN fb_utile  > 72 AND fb_utile  <= 96 THEN 96
@@ -1369,11 +1105,14 @@ class AutomaticDimensioning:
     def cable_type(self, zs_refpm):
         query = """UPDATE temp.cable_""" + zs_refpm.split("_")[2] + """
                 SET type_cable = subquery.case from  (SELECT id, fb_utile, aer_sou, CASE
-                    WHEN cable.capacite < 432 AND cable.aer_sou = 'S' THEN 'FOS SILEC'
+                    -- WHEN cable.capacite < 432 AND cable.aer_sou = 'S' THEN 'FOS SILEC'
+                    -- The new type of cables (TKF)
+                    WHEN cable.capacity < 432 AND cable.aer_sou = 'S' THEN 'FO TKF'
                     WHEN cable.capacite = 432 AND cable.aer_sou = 'S' THEN 'FOS ACOME'
                     WHEN cable.capacite >= 432 AND cable.aer_sou = 'S' THEN 'FOS PRYSMIAN'
                     WHEN cable.capacite > 288 AND cable.aer_sou = 'A' THEN 'WARNING!!!'
-                    WHEN cable.capacite <= 288 AND cable.aer_sou = 'A' AND ft_bt = 'FT' THEN 'FOA SILEC'
+                    -- WHEN cable.capacite <= 288 AND cable.aer_sou = 'A' AND ft_bt = 'FT' THEN 'FOA SILEC'
+                    WHEN cable.capacite <= 288 AND cable.aer_sou = 'A' AND ft_bt = 'FT' THEN 'FO TKF'
                     WHEN cable.capacite <= 288 AND cable.aer_sou = 'A' AND ft_bt = 'BT' THEN 'FOA ACOME'
                 END
                 FROM temp.cable_""" + zs_refpm.split("_")[2] + """ as cable) subquery
@@ -1394,20 +1133,28 @@ class AutomaticDimensioning:
                         WHEN capacite = 576 AND type_cable = 'FOS PRYSMIAN' THEN 9
                         WHEN capacite = 720 AND type_cable = 'FOS PRYSMIAN' THEN 10
                         WHEN capacite = 864 AND type_cable = 'FOS PRYSMIAN' THEN 11
-                        WHEN capacite = 12 AND type_cable = 'FOA SILEC' THEN 12
-                        WHEN capacite = 24 AND type_cable = 'FOA SILEC' THEN 13
-                        WHEN capacite = 48 AND type_cable = 'FOA SILEC' THEN 14
-                        WHEN capacite = 72 AND type_cable = 'FOA SILEC' THEN 15
-                        WHEN capacite = 96 AND type_cable = 'FOA SILEC' THEN 16
-                        WHEN capacite = 144 AND type_cable = 'FOA SILEC' THEN 17
-                        WHEN capacite = 288 AND type_cable = 'FOA SILEC' THEN 18
-                        WHEN capacite = 12 AND type_cable = 'FOS SILEC' THEN 19
-                        WHEN capacite = 24 AND type_cable = 'FOS SILEC' THEN 20
-                        WHEN capacite = 48 AND type_cable = 'FOS SILEC' THEN 21
-                        WHEN capacite = 72 AND type_cable = 'FOS SILEC' THEN 22
-                        WHEN capacite = 96 AND type_cable = 'FOS SILEC' THEN 23
-                        WHEN capacite = 144 AND type_cable = 'FOS SILEC' THEN 24
-                        WHEN capacite = 288 AND type_cable = 'FOS SILEC' THEN 25
+                        -- WHEN capacite = 12 AND type_cable = 'FOA SILEC' THEN 12
+                        -- WHEN capacite = 24 AND type_cable = 'FOA SILEC' THEN 13
+                        -- WHEN capacite = 48 AND type_cable = 'FOA SILEC' THEN 14
+                        -- WHEN capacite = 72 AND type_cable = 'FOA SILEC' THEN 15
+                        -- WHEN capacite = 96 AND type_cable = 'FOA SILEC' THEN 16
+                        -- WHEN capacite = 144 AND type_cable = 'FOA SILEC' THEN 17
+                        -- WHEN capacite = 288 AND type_cable = 'FOA SILEC' THEN 18
+                        -- WHEN capacite = 12 AND type_cable = 'FOS SILEC' THEN 19
+                        -- WHEN capacite = 24 AND type_cable = 'FOS SILEC' THEN 20
+                        -- WHEN capacite = 48 AND type_cable = 'FOS SILEC' THEN 21
+                        -- WHEN capacite = 72 AND type_cable = 'FOS SILEC' THEN 22
+                        -- WHEN capacite = 96 AND type_cable = 'FOS SILEC' THEN 23
+                        -- WHEN capacite = 144 AND type_cable = 'FOS SILEC' THEN 24
+                        -- WHEN capacite = 288 AND type_cable = 'FOS SILEC' THEN 25
+                        WHEN capacite = 12 AND type_cable = 'FO TKF' THEN 27
+                        WHEN capacite = 24 AND type_cable = 'FO TKF' THEN 28
+                        WHEN capacite = 36 AND type_cable = 'FO TKF' THEN 29
+                        WHEN capacite = 48 AND type_cable = 'FO TKF' THEN 30
+                        WHEN capacite = 72 AND type_cable = 'FO TKF' THEN 31
+                        WHEN capacite = 96 AND type_cable = 'FO TKF' THEN 32
+                        WHEN capacite = 144 AND type_cable = 'FO TKF' THEN 33
+                        WHEN capacite = 288 AND type_cable = 'FO TKF' THEN 34
                     END"""
 
         self.executerRequette(query, False)
