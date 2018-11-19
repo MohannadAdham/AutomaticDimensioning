@@ -603,7 +603,7 @@ class AutomaticDimensioning:
 
 
     def calcul_fibres_utiles(self):
-        ''' Calculates the number of fibers per cheminement within the working table cheminement_* '''
+        ''' Calculate the number of fibers per cheminement within the working table cheminement_* '''
 
         message = "calcul_fibres_utiles function"
         self.fenetreMessage(QMessageBox, "info" , message)
@@ -954,7 +954,6 @@ class AutomaticDimensioning:
 
 
         self.remove_raccord(zs_refpm)
-        # self.fenetreMessage(QMessageBox, "info", "After remove raccord")
         try:
             self.add_pg_layer("temp", "cheminement_" + zs_refpm.split("_")[2].lower() + "_without_r")
         except Exception as e:
@@ -970,6 +969,8 @@ class AutomaticDimensioning:
 
 
     def fibre_utile_to_cable_capacity(self, zs_refpm):
+        """ Calculates the capacity of the cables based on the number of the fibres utiles """
+
         query = """UPDATE temp.cable_""" + zs_refpm.split("_")[2] + """ as cable
                 SET capacite = subquery.case
                 FROM
@@ -993,55 +994,35 @@ class AutomaticDimensioning:
                              FROM temp.cable_""" + zs_refpm.split("_")[2] + """) as subquery
                 WHERE cable.id = subquery.id"""
 
-        # self.fenetreMessage(QMessageBox, "Successful!", query)
         self.executerRequette(query, False)
 
 
 
 
-
-    # def calcul_fb_utiles_cable(self, shema, zs_refpm):
-    #     self.fenetreMessage(QMessageBox, "info", "before defining the query")
-    #     query = """UPDATE temp.cable_al01 cable
-    #             SET fb_utile = subquery.cb_fo_util
-
-    #             FROM (SELECT id as cable_id, max(cm_fo_util) as cb_fo_util FROM temp.cable_al01 as cable 
-    #             INNER JOIN temp.cheminement_al01 as chem ON ST_length(ST_intersection(cable.geom, chem.geom)) > 0.1
-    #             GROUP BY cable_id) AS subquery
-
-    #             WHERE cable.id = subquery.cable_id;"""
-    #     self.fenetreMessage(QMessageBox, "info", "The query will be executed")
-    #     self.executerRequette(query, False)
-    #     self.fenetreMessage(QMessageBox, "info", "The query is executed")
-
-
     def calcul_cable_dimensions(self):
+        """ Calcualtes the dimensions of the cables on multiple steps by calling several more specialized methods """
+
         table_name = "cable"
         schema = "temp"
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         self.create_temp_cable_table(schema, table_name, zs_refpm)
-        # self.split_cable (schema, table_name, zs_refpm)
+
+        # Add the columns fb_utile, capacite, Aer_Sou, ft_bt, type_cable, cb_code to the working table that will hold the results of the dimensioning
         add_columns = "ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN fb_utile integer; ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN capacite integer; ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN Aer_Sou varchar(3);  ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN ft_bt varchar(3); ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN type_cable varchar(30); ALTER TABLE temp.cable_" + zs_refpm.split("_")[2] + " ADD COLUMN cb_code integer; "
         self.executerRequette(add_columns, False)
-        # self.fenetreMessage(QMessageBox, "info", "After add columns and before calcul_fb_utiles")
         self.calcul_fb_utile_cable(zs_refpm)
-        # calculate_distance = """UPDATE temp.cable_al01 cable
-        #         SET dist = ST_Length(geom);"""
-
-        # # self.calcul_fb_utiles_cable(shema, zs_refpm)
-        # self.fenetreMessage(QMessageBox, "info", "After calcul_fb_utiles")
-        # self.executerRequette(calculate_distance, False)
         self.fibre_utile_to_cable_capacity(zs_refpm)
         self.aer_sou(zs_refpm)
         self.ft_bt(zs_refpm)
         self.cable_type(zs_refpm)
         self.update_cb_code(zs_refpm)
+        # Add the result to the map canvas
         self.add_pg_layer("temp", "cable_" + zs_refpm.split("_")[2].lower())
 
 
     def calcul_fb_utile_cable(self, zs_refpm):
-        # self.fenetreMessage(QMessageBox, "test", "zs_refpm = ")
-        # self.fenetreMessage(QMessageBox, "test", "zs_refpm = " + zs_refpm)
+        """ Calculates the number of the fibres utiles per cable based of the nummbers of fibres utiles of the cheminements """
+
         query = """UPDATE temp.cable_""" + zs_refpm.split("_")[2] + """ cable
                 SET fb_utile = subquery.cb_fo_util
 
@@ -1053,13 +1034,13 @@ class AutomaticDimensioning:
 
                 WHERE cable.id = subquery.cable_id;"""
 
-        # self.fenetreMessage(QMessageBox, "info", "The query 'calcul_fb_utile_cable will be executed")
         self.executerRequette(query, False)
         self.fenetreMessage(QMessageBox, "info", "The query 'calcul_fb_utile_cable' is executed")
 
 
     def aer_sou(self, zs_refpm):
-        # self.fenetreMessage(QMessageBox, "info", "aer_sou")
+        """ Determines if the cable is of type "Aerian" or "Souterrain" """ 
+
         query = """ UPDATE temp.cable_""" + zs_refpm.split("_")[2] + """ cable
                 SET aer_sou = 
                 CASE 
@@ -1085,6 +1066,8 @@ class AutomaticDimensioning:
 
 
     def ft_bt(self, zs_refpm):
+        """ Determines if the poteau is of type "FT" or "BT" """
+
         query = """UPDATE temp.cable_""" + zs_refpm.split("_")[2] + """ set ft_bt = case
             --WHEN 0 = ANY(subquery.array_pt_code) or 12 = any(subquery.array_pt_code) THEN 'FT'
             WHEN 1 = ANY(subquery.array_pt_code) or 2 = any(subquery.array_pt_code) THEN 'BT'
@@ -1099,11 +1082,11 @@ class AutomaticDimensioning:
 
 
         self.executerRequette(query, False)
-        # self.fenetreMessage(QMessageBox, "info", "The query of ft_bt is executed")
-
 
 
     def cable_type(self, zs_refpm):
+        """ Determines the brand ("marque") of the cables """
+
         query = """UPDATE temp.cable_""" + zs_refpm.split("_")[2] + """
                 SET type_cable = subquery.case from  (SELECT id, fb_utile, aer_sou, CASE
                     -- WHEN cable.capacite < 432 AND cable.aer_sou = 'S' THEN 'FOS SILEC'
@@ -1119,9 +1102,10 @@ class AutomaticDimensioning:
                 FROM temp.cable_""" + zs_refpm.split("_")[2] + """ as cable) subquery
                 WHERE temp.cable_""" + zs_refpm.split("_")[2] + """.id = subquery.id;  """
         self.executerRequette(query, False)
-        # self.fenetreMessage(QMessageBox, "info", "The query of cable_type is executed")
 
     def update_cb_code(self, zs_refpm):
+        """ Determines the cb_code of the cable based on its capacity and its type """
+
         query = """ update temp.cable_""" + zs_refpm.split("_")[2] + """ set cb_code = case
                         WHEN capacite = 12 AND type_cable = 'FOA ACOME' THEN 1
                         WHEN capacite = 24 AND type_cable = 'FOA ACOME' THEN 2
@@ -1163,6 +1147,8 @@ class AutomaticDimensioning:
 
 
     def update_p_cheminement(self):
+        """ Updates the table p_cheminement in the database with orientation and the fo_util from the working table """
+
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         query_update_chem = """
         -- mettre a jour la geometrie
@@ -1193,6 +1179,8 @@ class AutomaticDimensioning:
 
         """
 
+        # A query to update the orientation and the fo_util of the shared cheminements between multiple ZSROs
+        
         query_update_chem_commun = """
             Do
             $$
@@ -1238,6 +1226,8 @@ class AutomaticDimensioning:
 
 
     def update_p_cable(self):
+        """ Copy the cables from the working table to the table p_cable in the database """
+
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         query_update_cable = """INSERT INTO prod.p_cable(cb_code, geom, cb_comment)
                                  SELECT cb_code, ST_LineMerge(geom), '""" + zs_refpm.split("_")[2] + """' from temp.cable_""" + zs_refpm.split("_")[2] + """  
@@ -1253,6 +1243,8 @@ class AutomaticDimensioning:
 
 
     def copy_style(self, source, dest):
+        """ A method to copy the style between two layers in the QGIS project """ 
+
         try:
             source_layer = QgsMapLayerRegistry.instance().mapLayersByName(source)[0]
             self.iface.setActiveLayer(source_layer)
