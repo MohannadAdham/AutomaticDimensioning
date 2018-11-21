@@ -11,14 +11,7 @@
         email                : mohannad.adm@gmail.com
  ***************************************************************************/
 
-/***************************************************************************
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- ***************************************************************************/
+
 """
 import PyQt4
 import sys
@@ -40,6 +33,8 @@ import processing
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from qgis.core import *
+from qgis.gui import QgsMessageBar
+import time
 # Initialize Qt resources from file resources.py
 import resources
 # Import the code for the dialog
@@ -48,8 +43,9 @@ import os.path
 
 
 class AutomaticDimensioning:
+    """ A class that defines the plugin itself """
+
     global conn, cursor
-    # global isMultistring
     isMultistring = False
     """QGIS Plugin Implementation."""
 
@@ -83,9 +79,15 @@ class AutomaticDimensioning:
         # Declare instance attributes
         self.actions = []
         self.menu = self.tr(u'&AutomaticDimensioning')
-        # TODO: We are going to let the user set this up in a future iteration
         self.toolbar = self.iface.addToolBar(u'AutomaticDimensioning')
         self.toolbar.setObjectName(u'AutomaticDimensioning')
+
+        # Define the levels of a message bar
+        self.info = QgsMessageBar.INFO 
+        self.critical = QgsMessageBar.CRITICAL
+        self.warning = QgsMessageBar.WARNING
+        self.success = QgsMessageBar.SUCCESS
+
 
         # Create the dialog (after translation) and keep reference
         self.dlg = AutomaticDimensioningDialog()
@@ -111,7 +113,7 @@ class AutomaticDimensioning:
         Button_fibres_utiles = self.dlg.findChild(QPushButton, "pushButton_fibres_utiles")
         QObject.connect(Button_fibres_utiles, SIGNAL("clicked()"), self.calcul_fibres_utiles)
 
-        # Connect the button "pushButton_"
+        # Connect the button "pushButton_dimensions"
         Button_dimensions = self.dlg.findChild(QPushButton, "pushButton_dimensions")
         QObject.connect(Button_dimensions, SIGNAL("clicked()"), self.calcul_cable_dimensions)
 
@@ -146,6 +148,7 @@ class AutomaticDimensioning:
         return QCoreApplication.translate('AutomaticDimensioning', message)
 
 
+
     def add_action(
         self,
         icon_path,
@@ -158,9 +161,6 @@ class AutomaticDimensioning:
         whats_this=None,
         parent=None):
     
-
-        # Create the dialog (after translation) and keep reference
-        # self.dlg = AutomaticDimensioningDialog()
 
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
@@ -211,18 +211,24 @@ class AutomaticDimensioning:
     def run(self):
         """Run method that performs all the real work"""
 
+        # Get the paramaeters of the database
         self.GetParamBD(self.dlg.lineEdit_BD, self.dlg.lineEdit_Password, self.dlg.lineEdit_User, self.dlg.lineEdit_Host, self.dlg.Schema_grace)
+
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
-        # See if OK was pressed
-        # Activate the connection button 
-        self.dlg.findChild(QPushButton, "pushButton_connexion").setEnabled(True)
+
         if result:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
             pass
+
+            
+
+    def sendMessageBar(self, msgType, title, message, timeDur=4):
+        self.iface.messageBar().pushMessage(title, message, level=msgType, duration=timeDur)
+        
 
 
 
@@ -329,7 +335,8 @@ class AutomaticDimensioning:
                 cursor.close()
             
         except Exception as e:
-            self.fenetreMessage(QMessageBox.Warning,"Erreur_executerRequette",str(e))
+            # self.fenetreMessage(QMessageBox.Warning,"Erreur_executerRequette",str(e))
+            self.sendMessageBar(self.critical, "Erreur_executerRequette", str(e), 6)
             cursor.close()
             self.connectToDb()
 
@@ -435,6 +442,7 @@ class AutomaticDimensioning:
 
 
                 print "Schema found"
+                self.sendMessageBar(self.success, "Success", "Connected successfuly to the database", 2)
             else:
                 # self.dlg2.findChild(QPushButton,"pushButton_controle_avt_migration").setEnabled(False)
                 print "Schema not found"
@@ -451,13 +459,8 @@ class AutomaticDimensioning:
         ''' Determines the orientation of the cheminements within the the temporary table, adds the resulted table
         as a layer to the project and styles it '''
 
-        message =  "calcu_orientation function"
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
-        self.fenetreMessage(QMessageBox, "Successful!", message)
-        # Create temp cheminement table
-        # table_name = self.dlg.comboBox_cheminement.text()
         table_name = "p_cheminement"
-        # self.fenetreMessage(QMessageBox, "Successful!", table_name)
         schema_name = self.dlg.Schema_prod.text()
         # self.fenetreMessage(QMessageBox, "Successful!", schema_name)
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
@@ -580,6 +583,7 @@ class AutomaticDimensioning:
         # Execute the query that determines the orientation of the cables
         result = self.executerRequette(query3, True)
 
+        self.sendMessageBar(self.success, "success", "Les cheminements sont orientés. Veuillez consulter la table " + "cheminement_" + zs_refpm.split("_")[2].lower(), 4)
         # Add the layer to the project
         self.add_pg_layer("temp", "cheminement_" + zs_refpm.split("_")[2].lower())
 
@@ -597,7 +601,8 @@ class AutomaticDimensioning:
 
 
         else:
-            self.fenetreMessage(QMessageBox, "Successful!" ,"The table is oriented")
+            # self.fenetreMessage(QMessageBox, "Successful!" ,"The table is oriented")
+            self.sendMessageBar(self.success, "success", "Les cheminements sont orientés", 3)
 
         
 
@@ -605,8 +610,8 @@ class AutomaticDimensioning:
     def calcul_fibres_utiles(self):
         ''' Calculate the number of fibers per cheminement within the working table cheminement_* '''
 
-        message = "calcul_fibres_utiles function"
-        self.fenetreMessage(QMessageBox, "info" , message)
+        # message = "calcul_fibres_utiles function"
+        # self.fenetreMessage(QMessageBox, "info" , message)
         zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
         # zs_refpm = self.dlg.comboBox_zs_refpm.currentText()
 
@@ -653,28 +658,7 @@ class AutomaticDimensioning:
                      WHERE temp.p_cheminement_' || sro || '.this_id = B.this_id';
 
 
-                -------------------------------- New part developped by Kevin ---------------------------
 
-
-                /*EXECUTE ' UPDATE temp.p_cheminement_' || sro || '
-                        SET fo_util = A.zd_fo_util,
-                            reserve = A.reserve  --------- new 2 --------
-
-                        FROM (
-                            SELECT f.this_id, zd_fo_util, 
-                            (SUM(f2.reserve) + (Case when z.zd_fo_util IS NOT NULL then z.zd_fo_util else 0 End)) as reserve ------------------- new 3 -----------------------
-                            FROM temp.p_cheminement_' || sro || ' f
-                            LEFT JOIN temp.p_cheminement_' || sro || ' f2 ON ST_DWITHIN(ST_EndPoint(f.geom), ST_StartPoint(f2.geom), 0.0001)
-                            LEFT JOIN prod.p_ebp e ON ST_DWITHIN(ST_EndPoint(f.geom), e.geom, 0.0001)
-                            LEFT JOIN prod.p_zdep z ON e.bp_id = z.zd_r6_code
-                            WHERE f2.this_id IS NULL AND e.bp_id IS NOT NULL AND e.bp_pttype <> 7
-                            GROUP BY f.this_id, f.rang, z.zd_fo_util
-                            ORDER BY f.this_id
-                            ) AS A
-                        WHERE temp.p_cheminement_' || sro || '.this_id = A.this_id';*/
-
-
-                --------------------------------------------------------------------------------------------
 
 
                 DROP TABLE IF EXISTS temp.p_cheminement_tbr;
@@ -718,6 +702,7 @@ class AutomaticDimensioning:
 
         # Enable the button of cable dimensioning
         self.dlg.findChild(QPushButton, "pushButton_dimensions").setEnabled(True)
+        self.sendMessageBar(self.success, "Success", "Les fibres utiles ont ete calculees. Veuillez consulter la table " + "cheminement_" + zs_refpm.split("_")[2].lower(), 5)
 
 
     # ---------------------------------- needs to be modified --------------------------------------
@@ -804,7 +789,8 @@ class AutomaticDimensioning:
 
         # self.fenetreMessage(QMessageBox, "info", query_topo)
         self.executerRequette(query_topo, False)
-        self.fenetreMessage(QMessageBox, "Success", "Topology has been verified")
+        # self.fenetreMessage(QMessageBox, "Success", "Topology has been verified")
+        self.sendMessageBar(self.success, "Success", "Topology has been verified. Please consult the table " + "cm_continuite_" + zs_refpm.split("_")[2].lower(), 4)
         try:
             self.add_pg_layer("prod", "cm_continuite_" + zs_refpm.split("_")[2].lower())
         except Exception as e:
@@ -840,12 +826,16 @@ class AutomaticDimensioning:
             # Add the vector layer to the map
             try:
                 QgsMapLayerRegistry.instance().addMapLayers([vlayer])
-                self.fenetreMessage(QMessageBox, "Success", "Layer %s is loaded" % vlayer.name())
+                # self.fenetreMessage(QMessageBox, "Success", "Layer %s is loaded" % vlayer.name())
+                self.sendMessageBar(self.info, "Info", "Layer %s is loaded" % vlayer.name(), 4)
             except Exception as e:
-                self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
+                # self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
+                self.sendMessageBar(self.warning, "Warning", "Layer %s is loaded" % vlayer.name(), 4)
+
 
         else :
-            self.fenetreMessage(QMessageBox, "Success", "Layer %s already exists but it has been updated" % vlayer.name())
+            # self.fenetreMessage(QMessageBox, "Success", "Layer %s already exists but it has been updated" % vlayer.name())
+            self.sendMessageBar(self.info, "Info", "Layer %s already exists but it has been updated" % vlayer.name(), 4)
 
 
 
@@ -1018,6 +1008,7 @@ class AutomaticDimensioning:
         self.update_cb_code(zs_refpm)
         # Add the result to the map canvas
         self.add_pg_layer("temp", "cable_" + zs_refpm.split("_")[2].lower())
+        self.sendMessageBar(self.success, "Success", "les cables ont ete dimensionnes. Veuillez consuleter la table " + zs_refpm.split("_")[2].lower(), 5)
 
 
     def calcul_fb_utile_cable(self, zs_refpm):
@@ -1035,7 +1026,8 @@ class AutomaticDimensioning:
                 WHERE cable.id = subquery.cable_id;"""
 
         self.executerRequette(query, False)
-        self.fenetreMessage(QMessageBox, "info", "The query 'calcul_fb_utile_cable' is executed")
+        # self.fenetreMessage(QMessageBox, "info", "The query 'calcul_fb_utile_cable' is executed")
+        # self.sendMessageBar(self.info, "Info", "The query 'calcul_fb_utile_cable' is executed", 2 )
 
 
     def aer_sou(self, zs_refpm):
@@ -1180,7 +1172,7 @@ class AutomaticDimensioning:
         """
 
         # A query to update the orientation and the fo_util of the shared cheminements between multiple ZSROs
-        
+
         query_update_chem_commun = """
             Do
             $$
@@ -1222,7 +1214,8 @@ class AutomaticDimensioning:
 
         self.executerRequette(query_update_chem, False)
         self.executerRequette(query_update_chem_commun, False)
-        self.fenetreMessage(QMessageBox, "info", "The table p_cheminement is updated")
+        # self.fenetreMessage(QMessageBox, "info", "The table p_cheminement is updated")
+        self.sendMessageBar(self.success, "Success", "The table p_cheminement is updated", 4)
 
 
     def update_p_cable(self):
@@ -1237,9 +1230,11 @@ class AutomaticDimensioning:
             # self.fenetreMessage(QMessageBox, "info", "The query will be executed")
             self.executerRequette(query_update_cable, False)
             if not self.isMultistring:
-                self.fenetreMessage(QMessageBox, "info", "The table p_cable is updated ")
+                # self.fenetreMessage(QMessageBox, "info", "The table p_cable is updated")
+                self.sendMessageBar(self.success, "Success", "The table p_cable is updated", 4)
         except Exception as e:
-            self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
+            # self.fenetreMessage(QMessageBox.Warning,"Erreur_fenetreMessage", str(e))
+            self.sendMessageBar(self.CRITICAL, "Error", str(e), 4)
 
 
     def copy_style(self, source, dest):
